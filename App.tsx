@@ -10,15 +10,22 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [pdfBuffer, setPdfBuffer] = useState<ArrayBuffer | null>(null);
 
   const processFile = async (file: File) => {
     setIsProcessing(true);
     setError(null);
+    setPdfBuffer(null);
 
     try {
       let textContent = '';
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-        textContent = await extractTextFromPDF(file);
+        // Store buffer for slicing later
+        const buffer = await file.arrayBuffer();
+        setPdfBuffer(buffer);
+        // Create a new File object from buffer for extraction to avoid stream locked issues if reused
+        const pdfFile = new File([buffer], file.name, { type: "application/pdf" });
+        textContent = await extractTextFromPDF(pdfFile);
       } else {
         textContent = await file.text();
       }
@@ -65,7 +72,7 @@ const App: React.FC = () => {
   };
 
   if (reports.length > 0) {
-    return <Dashboard reports={reports} onReset={() => setReports([])} />;
+    return <Dashboard reports={reports} pdfBuffer={pdfBuffer} onReset={() => { setReports([]); setPdfBuffer(null); }} />;
   }
 
   return (
@@ -76,7 +83,7 @@ const App: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-2">ZüriGrade Validator</h1>
           <p className="text-gray-500 text-lg">
-            Upload Bildungszentrum Zürichsee report cards (PDF) to validate grades and generate insights.
+            Upload Bildungszentrum Zürichsee report cards (PDF) to validate grades.
           </p>
         </div>
 

@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import { PDFDocument } from 'pdf-lib';
 
 // Set worker source explicitly to the same version as the library
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.mjs`;
@@ -73,4 +74,34 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
   }
 
   return fullText;
+};
+
+/**
+ * Creates a Blob URL for a single page of the PDF
+ */
+export const slicePdfPage = async (pdfBuffer: ArrayBuffer, pageNumber: number): Promise<string> => {
+  try {
+    // Load the source PDF
+    const srcDoc = await PDFDocument.load(pdfBuffer);
+    
+    // Create a new PDF
+    const newDoc = await PDFDocument.create();
+    
+    // Copy the specific page (pdf-lib uses 0-based indexing)
+    // Validate page number
+    if (pageNumber < 1 || pageNumber > srcDoc.getPageCount()) {
+        throw new Error(`Invalid page number ${pageNumber}`);
+    }
+
+    const [copiedPage] = await newDoc.copyPages(srcDoc, [pageNumber - 1]);
+    
+    newDoc.addPage(copiedPage);
+    
+    const pdfBytes = await newDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.error("Error slicing PDF:", error);
+    throw error;
+  }
 };

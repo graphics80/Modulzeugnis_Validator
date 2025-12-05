@@ -1,22 +1,42 @@
 import React, { useState } from 'react';
 import { StudentReport } from '../types';
+import { slicePdfPage } from '../services/pdfService';
 import { 
   CheckCircleIcon, 
   ExclamationTriangleIcon, 
   XCircleIcon, 
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  DocumentIcon
 } from '@heroicons/react/24/solid';
 
 interface Props {
   student: StudentReport;
+  pdfBuffer: ArrayBuffer | null;
 }
 
-const StudentCard: React.FC<Props> = ({ student }) => {
+const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isOpeningPdf, setIsOpeningPdf] = useState(false);
 
   const hasFailingGrades = student.failingModules.length > 0;
   const isAverageCorrect = student.isValidAverage;
+
+  const handleOpenPdf = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!pdfBuffer || !student.pageNumber) return;
+
+    setIsOpeningPdf(true);
+    try {
+        const url = await slicePdfPage(pdfBuffer, student.pageNumber);
+        window.open(url, '_blank');
+    } catch (err) {
+        console.error("Failed to open PDF slice", err);
+        alert("Could not generate PDF for this student.");
+    } finally {
+        setIsOpeningPdf(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4 transition-all hover:shadow-md">
@@ -51,7 +71,7 @@ const StudentCard: React.FC<Props> = ({ student }) => {
         </div>
 
         {/* Action Bar */}
-        <div className="mt-4 flex space-x-3 border-t border-gray-100 pt-3">
+        <div className="mt-4 flex justify-between items-center border-t border-gray-100 pt-3">
             <button 
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="flex items-center text-sm text-gray-600 hover:text-gray-900 font-medium"
@@ -62,6 +82,17 @@ const StudentCard: React.FC<Props> = ({ student }) => {
                     <><ChevronDownIcon className="w-4 h-4 mr-1"/> Show {student.modules.length} Modules</>
                 )}
             </button>
+
+            {pdfBuffer && student.pageNumber && (
+                <button
+                    onClick={handleOpenPdf}
+                    disabled={isOpeningPdf}
+                    className="flex items-center text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
+                >
+                    <DocumentIcon className="w-4 h-4 mr-1" />
+                    {isOpeningPdf ? 'Opening...' : 'View PDF'}
+                </button>
+            )}
         </div>
 
         {/* Expanded Details */}
@@ -81,7 +112,7 @@ const StudentCard: React.FC<Props> = ({ student }) => {
                                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{m.semester}</td>
                                 <td className="px-3 py-2 text-sm text-gray-900">
                                     <span className="font-mono text-gray-400 mr-2">{m.moduleId}</span>
-                                    {m.moduleName}
+                                    <span className="min-w-0 truncate block max-w-md">{m.moduleName}</span>
                                 </td>
                                 <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-medium ${
                                     m.grade < 4.0 ? 'text-red-600' : 'text-gray-900'

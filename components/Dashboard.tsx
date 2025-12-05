@@ -11,6 +11,7 @@ import {
 
 interface Props {
   reports: StudentReport[];
+  pdfBuffer: ArrayBuffer | null;
   onReset: () => void;
 }
 
@@ -90,7 +91,7 @@ const MEDIA_PLAN = [
   { semester: 7, modules: ['275', '282'] },
 ];
 
-const Dashboard: React.FC<Props> = ({ reports, onReset }) => {
+const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, onReset }) => {
   const stats = useMemo(() => {
     const total = reports.length;
     const avgMismatch = reports.filter(r => !r.isValidAverage).length;
@@ -235,7 +236,7 @@ const Dashboard: React.FC<Props> = ({ reports, onReset }) => {
       {/* List */}
       <div className="space-y-4">
         {reports.map((report) => (
-          <StudentCard key={report.id} student={report} />
+          <StudentCard key={report.id} student={report} pdfBuffer={pdfBuffer} />
         ))}
       </div>
     </div>

@@ -13,7 +13,7 @@
     "react-dom": "^19.2.1",
     "@heroicons/react": "^2.2.0",
     "pdfjs-dist": "4.0.379",
-    "@google/genai": "^1.31.0"
+    "pdf-lib": "1.17.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -1,15 +1,21 @@
 import { StudentReport, ModuleGrade } from '../types';
 
 export const parseOCRText = (text: string): StudentReport[] => {
-  // Split content by the separator usually found in OCR streams or double newlines implying pages
-  // The provided input has "==Start of OCR for page X=="
-  const pages = text.split(/==Start of OCR for page \d+==/);
+  // Split content by capturing the page number in the delimiter
+  // This results in array: ["", "1", "Content Page 1...", "2", "Content Page 2...", ...]
+  const parts = text.split(/==Start of OCR for page (\d+)==/);
   
   const reports: StudentReport[] = [];
 
-  pages.forEach((pageRaw) => {
-    let page = pageRaw.trim();
-    if (!page || page.length < 50) return;
+  // Iterate through parts. Index 0 is usually empty pre-text.
+  // i is the page number index, i+1 is the content.
+  for (let i = 1; i < parts.length; i += 2) {
+    const pageNumStr = parts[i];
+    let page = parts[i + 1].trim();
+    
+    if (!page || page.length < 50) continue;
+
+    const pageNumber = parseInt(pageNumStr, 10);
 
     // --- NORMALIZATION STEP ---
     // Aggressively insert newlines before any Semester/Year pattern (e.g., HE/22, FR/24).
@@ -67,8 +73,8 @@ export const parseOCRText = (text: string): StudentReport[] => {
     let currentModule: Partial<ModuleGrade> | null = null;
     let accumulatedName = "";
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+    for (let j = 0; j < lines.length; j++) {
+        const line = lines[j].trim();
         if (!line) continue;
 
         // GUARD: Stop processing if we hit the footer line
@@ -167,9 +173,10 @@ export const parseOCRText = (text: string): StudentReport[] => {
       calculatedAverage: calculatedRoundedAvg,
       isValidAverage,
       failingModules,
-      rawText: page
+      rawText: page,
+      pageNumber
     });
-  });
+  }
 
   return reports;
 };

@@ -18,6 +18,7 @@ export interface StudentReport {
   isValidAverage: boolean;
   failingModules: ModuleGrade[];
   rawText: string;
+  pageNumber: number; // 1-based page number in the original PDF
 }
 
 export interface ValidationSummary {
