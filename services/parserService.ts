@@ -1,14 +1,58 @@
-import { StudentReport, ModuleGrade } from '../types';
+import { StudentReport, ModuleGrade, AbuData, EgkData, EgkSemesterResult, AbuSemesterResult } from '../types';
+
+const round05 = (num: number) => Math.round(num * 2) / 2;
+const round01 = (num: number) => Math.round(num * 10) / 10;
+
+// Helper to extract a list of grades from a line matching a label
+const extractGradesFromLine = (text: string, labelRegex: RegExp): number[] => {
+  const match = text.match(labelRegex);
+  if (!match) return [];
+  
+  const content = text.substring(match.index! + match[0].length).split('\n')[0];
+  const numberPattern = /\b[1-6]\.[05]\b/g;
+  const numbers = content.match(numberPattern);
+  
+  return numbers ? numbers.map(n => parseFloat(n)) : [];
+};
+
+const extractGradesBlock = (page: string, startLabelRegex: RegExp, stopLabelRegex: RegExp): number[] => {
+    const lines = page.split('\n');
+    let capturing = false;
+    let grades: number[] = [];
+
+    for (const line of lines) {
+        if (startLabelRegex.test(line)) {
+            capturing = true;
+            const inlineGrades = line.match(/\b[1-6]\.[05]\b/g);
+            if (inlineGrades) {
+                grades.push(...inlineGrades.map(n => parseFloat(n)));
+            }
+            continue;
+        }
+
+        if (capturing && stopLabelRegex.test(line)) {
+            break;
+        }
+
+        if (capturing) {
+            const hasGrade = /\b[1-6]\.[05]\b/.test(line);
+            const hasText = /[a-z]/.test(line); 
+
+            if (hasGrade && !hasText) {
+                 const found = line.match(/\b[1-6]\.[05]\b/g);
+                 if (found) {
+                     grades.push(...found.map(n => parseFloat(n)));
+                 }
+            }
+        }
+    }
+    return grades;
+};
 
 export const parseOCRText = (text: string): StudentReport[] => {
-  // Split content by capturing the page number in the delimiter
-  // This results in array: ["", "1", "Content Page 1...", "2", "Content Page 2...", ...]
   const parts = text.split(/==Start of OCR for page (\d+)==/);
-  
   const reports: StudentReport[] = [];
 
-  // Iterate through parts. Index 0 is usually empty pre-text.
-  // i is the page number index, i+1 is the content.
   for (let i = 1; i < parts.length; i += 2) {
     const pageNumStr = parts[i];
     let page = parts[i + 1].trim();
@@ -17,16 +61,7 @@ export const parseOCRText = (text: string): StudentReport[] => {
 
     const pageNumber = parseInt(pageNumStr, 10);
 
-    // --- NORMALIZATION STEP ---
-    // Aggressively insert newlines before any Semester/Year pattern (e.g., HE/22, FR/24).
-    // STRICTLY matches HE or FR followed by 2 digits.
-    // This fixes issues where two columns are merged onto one line (e.g. "HE/22 ... 4.5 FR/24 ...")
-    page = page.replace(/((?:HE|FR)\s*\/\s*\d{2})/g, '\n$1');
-
-    // 1. Extract Name
-    // Pattern 1: "für [Name]" (ignoring footer "für QV")
-    // Pattern 2: "Name/Vorname [Name]"
-    // Pattern 3: Standard header address block "Herr\n[Name]" or "Frau\n[Name]"
+    // 1. Metadata Extraction
     const nameMatch = 
         page.match(/(?:^|\n)\s*für\s+(?!QV)(.+?)(\n|$)/i) || 
         page.match(/Name\/Vorname\s+(.+?)(\n|$)/i) ||
@@ -34,147 +69,114 @@ export const parseOCRText = (text: string): StudentReport[] => {
         page.match(/Frau\n(.+?)\n/);
     
     const name = nameMatch ? nameMatch[1].trim() : "Unknown Student";
-
-    // 2. Extract DOB
     const dobMatch = page.match(/Geburtsdatum\s+(\d{2}\.\d{2}\.\d{4})/);
     const dob = dobMatch ? dobMatch[1] : "Unknown";
-
-    // 3. Extract Class
-    const classMatch = page.match(/Klasse\s+(.+?)(\n|$)/);
+    const classMatch = page.match(/Klasse\s+(.+?)(\n|$)/) || page.match(/Klasse\n(.+?)\n/);
     const classId = classMatch ? classMatch[1].trim() : "Unknown";
-
-    // 4. Extract Company
     const companyMatch = page.match(/Lehrfirma\s+(.+?)(\n|$)/);
     const company = companyMatch ? companyMatch[1].trim() : "Unknown";
-
-    // 5. Extract Profession (Beruf)
     const professionMatch = page.match(/Beruf\s+(.+?)(\n|$)/);
     const profession = professionMatch ? professionMatch[1].trim() : "Unknown";
-
-    // 6. Extract Printed Average
-    // Regex looks for "Durchschnitt Module ... 4.8"
     const avgMatch = page.match(/Durchschnitt Module.*?(\d\.\d)/);
     const printedAverage = avgMatch ? parseFloat(avgMatch[1]) : 0;
 
-    // 7. Extract Modules (State Machine for Multi-line support)
-    const modules: ModuleGrade[] = [];
-    const lines = page.split('\n');
-    
-    // Pattern: HE/22 117 Module Name 4.5
-    // Start Pattern: Semester (Group 1), ID (Group 2), Rest (Group 3)
-    // Strict Regex: Only matches HE or FR followed by 2 digits (e.g. "HE / 22")
-    const moduleStartRegex = /^((?:HE|FR)\s*\/\s*\d{2})\s+(\d{3})\s+(.*)/;
-    
-    // Grade Pattern: Ends with float (e.g. " 4.5")
-    const gradeRegex = /\s+(\d\.\d)\s*$/;
-    // Standalone Grade Pattern: Line is just "4.5"
-    const standaloneGradeRegex = /^(\d\.\d)\s*$/;
+    // 2. ABU & EGK Extraction
+    let abuData: AbuData | undefined;
+    const abuAvgMatch = page.match(/Allgemeinbildender Unterricht\s+(\d\.\d)/);
+    if (abuAvgMatch) {
+      const abuPrintedAvg = parseFloat(abuAvgMatch[1]);
+      let spracheGrades = extractGradesBlock(page, /Sprache.*?Kommunikation/, /Gesellschaft/);
+      let gesellschaftGrades = extractGradesBlock(page, /Gesellschaft/, /Erweiterte/);
+      
+      const semesterResults: AbuSemesterResult[] = [];
+      const allAbuGrades: number[] = [];
+      const maxSemesters = Math.max(spracheGrades.length, gesellschaftGrades.length);
 
-    let currentModule: Partial<ModuleGrade> | null = null;
-    let accumulatedName = "";
+      for (let k = 0; k < maxSemesters; k++) {
+          const s = spracheGrades[k];
+          const g = gesellschaftGrades[k];
+          if (s !== undefined) allAbuGrades.push(s);
+          if (g !== undefined) allAbuGrades.push(g);
+          semesterResults.push({ sprache: s, gesellschaft: g });
+      }
 
-    for (let j = 0; j < lines.length; j++) {
-        const line = lines[j].trim();
-        if (!line) continue;
-
-        // GUARD: Stop processing if we hit the footer line
-        // This prevents the average grade from being attached to the last module
-        if (line.includes("Durchschnitt Module")) {
-            currentModule = null;
-            accumulatedName = "";
-            continue;
-        }
-
-        const startMatch = line.match(moduleStartRegex);
-
-        if (startMatch) {
-            // New module found. 
-            
-            // Normalize semester (remove spaces e.g. "HE / 22" -> "HE/22")
-            const semester = startMatch[1].replace(/\s+/g, '');
-            const moduleId = startMatch[2];
-            const rest = startMatch[3];
-
-            // Check if grade is on this line
-            const gradeMatch = rest.match(gradeRegex);
-            if (gradeMatch) {
-                // Single line module
-                const grade = parseFloat(gradeMatch[1]);
-                const moduleName = rest.substring(0, rest.lastIndexOf(gradeMatch[0])).trim();
-                modules.push({ semester, moduleId, moduleName, grade });
-                currentModule = null;
-                accumulatedName = "";
-            } else {
-                // Multi-line module started
-                currentModule = { semester, moduleId };
-                accumulatedName = rest;
-            }
-        } else if (currentModule) {
-            // We are inside a module, looking for continuation or grade
-            
-            const gradeOnlyMatch = line.match(standaloneGradeRegex);
-            const endGradeMatch = line.match(gradeRegex);
-
-            if (gradeOnlyMatch) {
-                // Case: Line is just "4.5"
-                const grade = parseFloat(gradeOnlyMatch[1]);
-                modules.push({
-                    semester: currentModule.semester!,
-                    moduleId: currentModule.moduleId!,
-                    moduleName: accumulatedName.trim(),
-                    grade
-                });
-                currentModule = null;
-                accumulatedName = "";
-            } else if (endGradeMatch) {
-                // Case: Line is "Description Part 2 4.5"
-                const grade = parseFloat(endGradeMatch[1]);
-                const textPart = line.substring(0, line.lastIndexOf(endGradeMatch[0])).trim();
-                accumulatedName += " " + textPart;
-                
-                modules.push({
-                    semester: currentModule.semester!,
-                    moduleId: currentModule.moduleId!,
-                    moduleName: accumulatedName.trim(),
-                    grade
-                });
-                currentModule = null;
-                accumulatedName = "";
-            } else {
-                // Case: Just more text description
-                accumulatedName += " " + line;
-            }
-        }
+      const abuCalced = allAbuGrades.length > 0 ? round05(allAbuGrades.reduce((a,b) => a+b, 0) / allAbuGrades.length) : 0;
+      abuData = { printedAverage: abuPrintedAvg, calculatedAverage: abuCalced, isValid: Math.abs(abuCalced - abuPrintedAvg) < 0.1, semesterResults };
     }
 
-    // 8. Calculations
-    // Use precise arithmetic mean
-    const totalScore = modules.reduce((acc, curr) => acc + curr.grade, 0);
-    const rawAvg = modules.length > 0 ? totalScore / modules.length : 0;
-    
-    // User requirement: Average of modules rounded to 0.1 accuracy
-    const calculatedRoundedAvg = Math.round(rawAvg * 10) / 10;
-    
-    // Check strict equality of the rounded values
-    const isValidAverage = Math.abs(calculatedRoundedAvg - printedAverage) < 0.001; 
-    
-    // Identify failing modules (Grade < 4.0)
-    const failingModules = modules.filter(m => m.grade < 4.0);
+    let egkData: EgkData | undefined;
+    const egkAvgMatch = page.match(/Erweiterte Grundkompetenzen\s+(\d\.\d)/);
+    if (egkAvgMatch) {
+      const egkPrintedAvg = parseFloat(egkAvgMatch[1]);
+      let englishGrades = extractGradesBlock(page, /Englisch/, /Mathematik/);
+      let mathGrades = extractGradesBlock(page, /Mathematik/, /Semesterdurchschnitt/);
+      let semesterAvgGrades = extractGradesBlock(page, /Semesterdurchschnitt EGK/, /Wirtschaft/);
+
+      const semesterResults: EgkSemesterResult[] = [];
+      for (let k = 0; k < semesterAvgGrades.length; k++) {
+        const printedSem = semesterAvgGrades[k];
+        const eng = englishGrades[k];
+        const math = mathGrades[k];
+        let calc = 0;
+        if (eng !== undefined && math !== undefined) calc = round05((eng + math) / 2);
+        else calc = eng ?? math ?? 0;
+
+        semesterResults.push({ english: eng, math: math, printedSemAvg: printedSem, calculatedSemAvg: calc, isValid: Math.abs(calc - printedSem) < 0.1 });
+      }
+
+      const egkCalced = semesterResults.length > 0 ? round05(semesterResults.reduce((a,b) => a + b.printedSemAvg, 0) / semesterResults.length) : 0;
+      egkData = { printedAverage: egkPrintedAvg, calculatedAverage: egkCalced, isValid: Math.abs(egkCalced - egkPrintedAvg) < 0.1, semesterResults };
+    }
+
+    // 3. Module Extraction (Overhauled for robust detection)
+    const modules: ModuleGrade[] = [];
+    const lines = page.split('\n');
+    const modHeaderRegex = /([A-Z]{2}\s*\/\s*\d{2})\s+(\d{3})/;
+
+    for (let j = 0; j < lines.length; j++) {
+      const line = lines[j].trim();
+      const match = line.match(modHeaderRegex);
+      
+      if (match) {
+        const semester = match[1].replace(/\s+/g, '');
+        const moduleId = match[2];
+        let grade: number | undefined = undefined;
+        let name = line.substring(match.index! + match[0].length).trim();
+        
+        // Inline Grade Check
+        const inlineGrade = name.match(/\b[1-6]\.[05]\b/);
+        if (inlineGrade) {
+          grade = parseFloat(inlineGrade[0]);
+          name = name.replace(inlineGrade[0], "").trim();
+        } else {
+          // Lookahead Grade Check (for multi-line or column layouts)
+          for (let k = j + 1; k < Math.min(j + 5, lines.length); k++) {
+            const nextLine = lines[k].trim();
+            if (modHeaderRegex.test(nextLine) || nextLine.includes("Durchschnitt Module")) break;
+            const nextGrade = nextLine.match(/^\s*([1-6]\.[05])\s*$/);
+            if (nextGrade) {
+              grade = parseFloat(nextGrade[1]);
+              break;
+            }
+          }
+        }
+
+        name = name.replace(/\s+/g, " ").trim();
+        modules.push({ semester, moduleId, moduleName: name || `Module ${moduleId}`, grade });
+      }
+    }
+
+    // Final Report Assembly
+    const gradedModules = modules.filter(m => m.grade !== undefined);
+    const calculatedAverage = gradedModules.length > 0 ? round01(gradedModules.reduce((a, b) => a + (b.grade || 0), 0) / gradedModules.length) : 0;
+    const isValidAverage = Math.abs(calculatedAverage - printedAverage) < 0.11; 
+    const failingModules = gradedModules.filter(m => (m.grade || 0) < 4.0);
 
     reports.push({
-      id: crypto.randomUUID(),
-      name,
-      dob,
-      classId,
-      company,
-      profession,
-      modules,
-      printedAverage,
-      calculatedAverage: calculatedRoundedAvg,
-      isValidAverage,
-      failingModules,
-      rawText: page,
-      pageNumber
+      id: `${name.toLowerCase().replace(/\s+/g, '-')}-${pageNumber}`,
+      name, dob, classId, company, profession, modules,
+      printedAverage, calculatedAverage, isValidAverage, failingModules,
+      rawText: page, pageNumber, abu: abuData, egk: egkData
     });
   }
 

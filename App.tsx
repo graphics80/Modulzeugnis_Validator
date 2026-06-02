@@ -72,7 +72,15 @@ const App: React.FC = () => {
   };
 
   if (reports.length > 0) {
-    return <Dashboard reports={reports} pdfBuffer={pdfBuffer} onReset={() => { setReports([]); setPdfBuffer(null); }} />;
+    return (
+      <Dashboard 
+        reports={reports} 
+        pdfBuffer={pdfBuffer} 
+        isProcessing={isProcessing}
+        onNewFile={processFile}
+        onReset={() => { setReports([]); setPdfBuffer(null); }} 
+      />
+    );
   }
 
   return (
@@ -81,7 +89,7 @@ const App: React.FC = () => {
         
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-2">ZüriGrade Validator</h1>
+          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-2">Zeugnis-Validator Mediamatiker Informatiker</h1>
           <p className="text-gray-500 text-lg">
             Upload Bildungszentrum Zürichsee report cards (PDF) to validate grades.
           </p>
