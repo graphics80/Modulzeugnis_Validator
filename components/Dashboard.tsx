@@ -46,11 +46,13 @@ const TILE_STYLES: Record<TileStatus, { box: string; id: string; name: string }>
 const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFile, onReset }) => {
   const stats = useMemo(() => {
     const total = reports.length;
-    const avgMismatch = reports.filter(r => !r.isValidAverage).length;
+    // Module-average metrics ignore separate ABU/EGK certificates (no module grades).
+    const moduleReports = reports.filter(r => r.hasModules);
+    const avgMismatch = moduleReports.filter(r => !r.isValidAverage).length;
     const failingStudents = reports.filter(r => r.failingModules.length > 0).length;
-    const globalAvg = average(reports.map(r => r.calculatedAverage));
+    const globalAvg = average(moduleReports.map(r => r.calculatedAverage));
 
-    return { total, avgMismatch, failingStudents, globalAvg };
+    return { total, avgMismatch, failingStudents, globalAvg, moduleCount: moduleReports.length };
   }, [reports]);
 
   const curriculum = detectCurriculum(reports.length > 0 ? reports[0].profession : '');
@@ -257,7 +259,7 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
             </div>
             <div>
                 <p className="text-sm text-gray-500 font-medium">Calc Average</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.globalAvg.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.moduleCount > 0 ? stats.globalAvg.toFixed(2) : '—'}</p>
             </div>
         </div>
 

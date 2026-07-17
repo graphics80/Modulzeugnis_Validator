@@ -24,6 +24,7 @@ interface Fixture {
   label: string;
   file: string;
   curriculum: 'INFORMATIKER' | 'MEDIAMATIKER';
+  kind?: 'MODULE' | 'ABU_CERT'; // ABU_CERT = separate ABU/EGK certificate, no module grades
   expected: {
     reports: number;
     pnabModules: number; // total modules marked Pnab across all reports
@@ -36,6 +37,7 @@ const FIXTURES: Fixture[] = [
   { label: 'Informatiker (IA23)', file: 'IA23 alle Klassen.pdf', curriculum: 'INFORMATIKER', expected: { reports: 42, pnabModules: 3, abuReports: 15, egkReports: 15 } },
   { label: 'IMS (IM23)',          file: 'IM23 alle Klassen.pdf', curriculum: 'INFORMATIKER', expected: { reports: 28, pnabModules: 0, abuReports: 0, egkReports: 0 } },
   { label: 'Mediamatiker (ME23)', file: 'ME23 alle Klassen.pdf', curriculum: 'MEDIAMATIKER', expected: { reports: 115, pnabModules: 4, abuReports: 0, egkReports: 0 } },
+  { label: 'Mediamatiker ABU-Zeugnis (AB23a)', file: 'AB23a.pdf', curriculum: 'MEDIAMATIKER', kind: 'ABU_CERT', expected: { reports: 19, pnabModules: 0, abuReports: 17, egkReports: 17 } },
 ];
 
 const SEARCH_DIRS = [
@@ -88,13 +90,17 @@ for (const fixture of FIXTURES) {
   const wrongCurriculum = reports.filter(r => detectCurriculum(r.profession)?.label !== fixture.curriculum);
   check(wrongCurriculum.length === 0, `Curriculum ${fixture.curriculum} für alle erkannt (${wrongCurriculum.length} abweichend)`);
 
-  const tooFewModules = reports.filter(r => r.modules.length < 20);
-  check(tooFewModules.length === 0,
-    `alle Zeugnisse ≥ 20 Module${tooFewModules.length ? ` — zu wenig bei: ${tooFewModules.slice(0, 3).map(r => `${r.name} (${r.modules.length})`).join(', ')}` : ''}`);
+  // Module-grade checks only apply to module certificates. The separate ABU/EGK
+  // certificate carries no modules; it is validated via the ABU/EGK blocks below.
+  if (fixture.kind !== 'ABU_CERT') {
+    const tooFewModules = reports.filter(r => r.modules.length < 20);
+    check(tooFewModules.length === 0,
+      `alle Zeugnisse ≥ 20 Module${tooFewModules.length ? ` — zu wenig bei: ${tooFewModules.slice(0, 3).map(r => `${r.name} (${r.modules.length})`).join(', ')}` : ''}`);
 
-  const avgMismatch = reports.filter(r => !r.isValidAverage);
-  check(avgMismatch.length === 0,
-    `berechneter Durchschnitt == gedruckter Durchschnitt${avgMismatch.length ? ` — Abweichung bei: ${avgMismatch.slice(0, 5).map(r => `${r.name} (calc ${r.calculatedAverage} vs. ${r.printedAverage})`).join(', ')}` : ''}`);
+    const avgMismatch = reports.filter(r => !r.isValidAverage);
+    check(avgMismatch.length === 0,
+      `berechneter Durchschnitt == gedruckter Durchschnitt${avgMismatch.length ? ` — Abweichung bei: ${avgMismatch.slice(0, 5).map(r => `${r.name} (calc ${r.calculatedAverage} vs. ${r.printedAverage})`).join(', ')}` : ''}`);
+  }
 
   const pnabEntries = reports.flatMap(r => r.modules.filter(m => m.pnab).map(m => ({ name: r.name, classId: r.classId, moduleId: m.moduleId })));
   check(pnabEntries.length === fixture.expected.pnabModules,

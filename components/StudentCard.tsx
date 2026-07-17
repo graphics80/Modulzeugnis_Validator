@@ -79,6 +79,20 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
   const isAverageCorrect = student.isValidAverage;
   const pnabModules = student.modules.filter(m => m.pnab);
 
+  const abuInvalid = !!student.abu && !student.abu.isValid;
+  const egkInvalid = !!student.egk && !student.egk.isValid;
+  const abuEgkInvalid = abuInvalid || egkInvalid;
+  // EGK subject rows only carry meaning for the Informatiker layout (Englisch +
+  // Mathematik); the Mediamatiker certificate is validated on the semester average.
+  const egkHasSubjects = !!student.egk?.semesterResults.some(r => r.english !== undefined || r.math !== undefined);
+
+  // ABU/EGK errors take visual precedence over Pnab in the list highlight.
+  const ringClass = abuEgkInvalid
+    ? 'border-red-400 ring-2 ring-red-200'
+    : pnabModules.length > 0
+      ? 'border-orange-400 ring-2 ring-orange-200'
+      : 'border-gray-200';
+
   const handleOpenPdf = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!pdfBuffer || !student.pageNumber) return;
@@ -96,9 +110,7 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-sm border overflow-hidden mb-4 transition-all hover:shadow-md ${
-      pnabModules.length > 0 ? 'border-orange-400 ring-2 ring-orange-200' : 'border-gray-200'
-    }`}>
+    <div className={`bg-white rounded-lg shadow-sm border overflow-hidden mb-4 transition-all hover:shadow-md ${ringClass}`}>
       <div className="p-5">
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -110,15 +122,37 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
           </div>
 
           <div className="flex flex-col items-end space-y-2">
-            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-semibold ${
-              isAverageCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
-              <span>Avg: {formatGrade(student.printedAverage)}</span>
-              {!isAverageCorrect && (
-                 <span className="text-xs opacity-75">(Calc: {formatGrade(student.calculatedAverage)})</span>
-              )}
-              {isAverageCorrect ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
-            </div>
+            {student.hasModules && (
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-semibold ${
+                isAverageCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+                <span>Avg: {formatGrade(student.printedAverage)}</span>
+                {!isAverageCorrect && (
+                   <span className="text-xs opacity-75">(Calc: {formatGrade(student.calculatedAverage)})</span>
+                )}
+                {isAverageCorrect ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
+              </div>
+            )}
+
+            {student.abu && (
+              <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold ${
+                abuInvalid ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+              }`} title="Allgemeinbildender Unterricht">
+                <span>ABU: {formatGrade(student.abu.printedAverage)}</span>
+                {abuInvalid && <span className="text-xs opacity-75">(Calc: {formatGrade(student.abu.calculatedAverage)})</span>}
+                {abuInvalid ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
+              </div>
+            )}
+
+            {student.egk && (
+              <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold ${
+                egkInvalid ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+              }`} title="Erweiterte Grundkompetenzen">
+                <span>EGK: {formatGrade(student.egk.printedAverage)}</span>
+                {egkInvalid && <span className="text-xs opacity-75">(Calc: {formatGrade(student.egk.calculatedAverage)})</span>}
+                {egkInvalid ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
+              </div>
+            )}
 
             {hasFailingGrades && (
               <div className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
@@ -186,12 +220,14 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
                         icon={<CalculatorIcon className="w-3 h-3 mr-1" />}
                         data={student.egk}
                         rows={[
-                          { label: 'Eng', cell: (r, i) => <td key={i} className="px-1">{formatGrade(r.english)}</td> },
-                          { label: 'Mat', cell: (r, i) => <td key={i} className="px-1">{formatGrade(r.math)}</td> },
+                          ...(egkHasSubjects ? [
+                            { label: 'Eng', cell: (r: EgkSemesterResult, i: number) => <td key={i} className="px-1">{formatGrade(r.english)}</td> },
+                            { label: 'Mat', cell: (r: EgkSemesterResult, i: number) => <td key={i} className="px-1">{formatGrade(r.math)}</td> },
+                          ] : []),
                           {
-                            label: 'Avg',
+                            label: egkHasSubjects ? 'Avg' : 'Sem-Ø',
                             className: 'border-t border-gray-200 font-medium bg-white',
-                            cell: (r, i) => (
+                            cell: (r: EgkSemesterResult, i: number) => (
                               <td key={i} className={`px-1 ${r.isValid ? 'text-green-600' : 'text-red-600 bg-red-50'}`}>
                                 {formatGrade(r.printedSemAvg)}
                               </td>
@@ -203,7 +239,8 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
                   </div>
                 )}
 
-                {/* Modules Table */}
+                {/* Modules Table — omitted on the separate ABU/EGK certificate */}
+                {student.modules.length > 0 && (
                 <div className="overflow-hidden border border-gray-200 rounded-md">
                   <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
@@ -234,6 +271,7 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
                       </tbody>
                   </table>
                 </div>
+                )}
             </div>
         )}
       </div>

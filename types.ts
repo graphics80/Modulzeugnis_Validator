@@ -38,6 +38,7 @@ export interface StudentReport {
   company: string;
   profession: string; // Beruf
   modules: ModuleGrade[];
+  hasModules: boolean; // false for separate ABU/EGK certificates that carry no module grades
   printedAverage: number;
   calculatedAverage: number;
   isValidAverage: boolean;

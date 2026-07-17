@@ -67,7 +67,9 @@ export const parseOCRText = (text: string): StudentReport[] => {
         /Frau\n(.+?)\n/,
     ], "Unknown Student");
     const dob = firstMatch(page, [/Geburtsdatum\s+(\d{2}\.\d{2}\.\d{4})/]);
-    const classId = firstMatch(page, [/Klasse\s+(.+?)(\n|$)/, /Klasse\n(.+?)\n/]);
+    // Class label is often absent on the ABU/EGK certificate; fall back to the
+    // bare class code (e.g. "ME23 6a", "IA23 a") printed above the grade grid.
+    const classId = firstMatch(page, [/Klasse\s+(.+?)(\n|$)/, /Klasse\n(.+?)\n/, /\b([A-Z]{2}\d{2}\s+\d?[a-z])\b/]);
     const company = firstMatch(page, [/Lehrfirma\s+(.+?)(\n|$)/]);
     // PDF text layer often separates the "Beruf" label from its value (column
     // sorting), so prefer the line carrying the EFZ/EBA profession title
@@ -106,25 +108,33 @@ export const parseOCRText = (text: string): StudentReport[] => {
     const egkAvgMatch = page.match(/Erweiterte Grundkompetenzen\s+(\d\.\d)/);
     if (egkAvgMatch) {
       const egkPrintedAvg = parseFloat(egkAvgMatch[1]);
-      const englishGrades = extractGradesBlock(lines, /Englisch/, /Mathematik/);
-      const mathGrades = extractGradesBlock(lines, /Mathematik/, /Semesterdurchschnitt/);
-      const semesterAvgGrades = extractGradesBlock(lines, /Semesterdurchschnitt EGK/, /Wirtschaft/);
+      // The printed "Semesterdurchschnitt EGK" row is the reliable anchor across
+      // all curricula (Sport follows it on the Mediamatiker ABU certificate).
+      const semesterAvgGrades = extractGradesBlock(lines, /Semesterdurchschnitt EGK/, /Sport|Wirtschaft|Durchschnitt/);
 
-      const semesterResults: EgkSemesterResult[] = [];
-      for (let k = 0; k < semesterAvgGrades.length; k++) {
-        const printedSem = semesterAvgGrades[k];
+      // Per-semester subject recomputation only holds for the Informatiker layout
+      // (Englisch + Mathematik, both starting in semester 1 → index-based pairing
+      // is correct). Mediamatiker EGK lists more subjects (Französisch,
+      // Betriebskommunikation, Marketingfachsprache) that begin in different
+      // semesters; their columns can't be recovered from the flat text layer, so
+      // only the overall average (mean of the printed semester averages) is checked.
+      const hasMathRow = /\bMathematik\b/.test(page);
+      const englishGrades = hasMathRow ? extractGradesBlock(lines, /Englisch/, /Mathematik/) : [];
+      const mathGrades = hasMathRow ? extractGradesBlock(lines, /Mathematik/, /Semesterdurchschnitt/) : [];
+
+      const semesterResults: EgkSemesterResult[] = semesterAvgGrades.map((printedSem, k) => {
         const eng = englishGrades[k];
         const math = mathGrades[k];
-        let calc = 0;
+        let calc: number | undefined;
         if (eng !== undefined && math !== undefined) calc = round05((eng + math) / 2);
-        else calc = eng ?? math ?? 0;
+        else if (eng !== undefined || math !== undefined) calc = eng ?? math;
+        // calc undefined → Mediamatiker semester: not independently checkable here
+        return { english: eng, math, printedSemAvg: printedSem, isValid: calc === undefined ? true : matchesPrinted(calc, printedSem) };
+      });
 
-        semesterResults.push({ english: eng, math: math, printedSemAvg: printedSem, isValid: matchesPrinted(calc, printedSem) });
-      }
-
-      const egkCalced = round05(average(semesterResults.map(r => r.printedSemAvg)));
-      // Section is valid only when the overall average AND every printed
-      // semester average check out — a single wrong semester marks it invalid.
+      const egkCalced = round05(average(semesterAvgGrades));
+      // Section is valid only when the overall average AND every checkable
+      // semester average agree — a single wrong semester marks it invalid.
       const egkValid = matchesPrinted(egkCalced, egkPrintedAvg) && semesterResults.every(r => r.isValid);
       egkData = { printedAverage: egkPrintedAvg, calculatedAverage: egkCalced, isValid: egkValid, semesterResults };
     }
@@ -183,6 +193,7 @@ export const parseOCRText = (text: string): StudentReport[] => {
     reports.push({
       id: `${name.toLowerCase().replace(/\s+/g, '-')}-${pageNumber}`,
       name, dob, classId, company, profession, modules,
+      hasModules: gradedModules.length > 0,
       printedAverage, calculatedAverage, isValidAverage, failingModules,
       pageNumber, abu: abuData, egk: egkData
     });
