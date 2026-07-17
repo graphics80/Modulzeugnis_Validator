@@ -99,31 +99,53 @@ gesamt_berechnet = round05( Mittel(alle Semesterdurchschnitte) )
 gesamt_gültig    = gesamt_berechnet == gedruckter EGK-Durchschnitt
 ```
 
-Der EGK-Bereich gilt nur als **gültig**, wenn der Gesamtschnitt **und jeder**
-Semesterdurchschnitt stimmen. Ein einziges falsches Semester macht den ganzen
-Bereich ungültig — deshalb ist ein Fehler in einer einzelnen EGK-Note (anders
-als bei ABU) erkennbar, sobald er den betroffenen Semesterdurchschnitt
-verschiebt.
+### Separates EGK/ABU-Zeugnis (Mediamatiker)
 
-### Hinweis zur Semesterzuordnung
+Nur Informatiker führen ABU/EGK auf dem Modulzeugnis. Bei Mediamatikern (und
+IMS) stehen diese Noten auf einem **eigenen** Zeugnis, das andere EGK-Fächer
+listet (Englisch, Französisch, Betriebskommunikation, Marketingfachsprache)
+statt Englisch/Mathematik. Der Validator erkennt solche Zeugnisse ohne
+Modulnoten, unterdrückt den Modul-Durchschnitt und prüft nur ABU/EGK.
 
-Die Zuordnung Fachnote → Semester erfolgt anhand der Spaltenreihenfolge von
-links. Beginnen Englisch und Mathematik im selben Semester, ist die Paarung je
-Semester korrekt. Setzt ein Fach erst später ein (BM-Wechsel), kann die
-positionsbasierte Paarung je Semester ungenau werden — die robuste **Prüfung 2**
-(Mittel der gedruckten Semesterdurchschnitte) bleibt davon unberührt.
+### Semesterzuordnung und Hybrid-Prüfung je Semester
+
+Prüfung 1 braucht die Zuordnung Fachnote → Semester; die entsteht aus der
+Spaltenreihenfolge von links. Ein jahresweise benotetes Fach (z. B. Mathematik)
+liefert nicht in jedem Semester eine Note, und **welches** Semester fehlt, geht
+beim Flachklopfen des PDF-Textes verloren. Darum drei Ausgänge je Semester:
+
+- **gültig** — der gedruckte Semesterdurchschnitt geht in natürlicher
+  Spaltenreihenfolge auf.
+- **unklar** — die natürliche Reihenfolge geht *nicht* auf, aber es existiert
+  eine gültige Umsortierung der Mathematik-Spalten, die ihn erklärt (bipartites
+  Matching). Ein einzelner Notenfehler, der global konsistent bleibt, landet
+  hier: **amber markiert zur manuellen Prüfung**, weder still durchgewunken noch
+  hart als Fehler gewertet.
+- **ungültig** — keine Zuordnung der gedruckten Noten erklärt den
+  Semesterdurchschnitt → harter Fehler.
+
+Der EGK-Bereich ist **hart ungültig**, wenn der Gesamtschnitt abweicht oder ein
+Semester *ungültig* ist. *Unklare* Semester lassen den Bereich gültig, werden
+aber separat (amber) hervorgehoben. Fehlt die vollständige Englisch-Zeile oder
+kommen keine Fachnoten vor (Mediamatiker), entfällt Prüfung 1 — die robuste
+**Prüfung 2** (Mittel der gedruckten Semesterdurchschnitte) greift immer.
 
 ---
 
 ## 6. Was im UI angezeigt wird
 
-- **Rotes Banner (ABU/EGK):** listet jedes Zeugnis mit ABU- oder
+- **Rotes Banner (ABU/EGK):** listet jedes Zeugnis mit hartem ABU- oder
   EGK-Notenfehler, inkl. betroffenem Bereich und — bei EGK — betroffenem
   Semester.
+- **Amber Banner (EGK unklar):** listet Zeugnisse mit *unklarem* EGK-Semester
+  (nur durch Umsortieren erklärbar) zur manuellen Prüfung.
 - **Oranges Banner (Pnab):** listet Zeugnisse mit «Prüfung nicht absolviert».
-- **Studenten-Karte:** grünes/rotes Badge je Bereich; fehlerhafte
-  EGK-Semesterzellen rot hinterlegt.
-- **Curriculum-Check:** Rasterabgleich der belegten Module gegen den Lehrplan.
+- **Studenten-Karte:** grün/amber/rot je Bereich; EGK-Semesterzellen grün
+  (gültig) / amber (unklar) / rot (ungültig); Karte bekommt einen roten Ring
+  bei hartem Fehler, amber bei unklar/Pnab.
+- **Curriculum-Check:** Rasterabgleich der belegten Module gegen den Lehrplan;
+  **fehlende** (im Dokument nicht vorkommende) Module amber mit ✗ und
+  Zähler-Badge, statt blass ausgegraut.
 
 ## 7. Wo im Code
 
@@ -132,4 +154,5 @@ positionsbasierte Paarung je Semester ungenau werden — die robuste **Prüfung 
 | Runden, Toleranz, `matchesPrinted` | [utils/grades.ts](../utils/grades.ts) |
 | Modul-, ABU-, EGK-, Pnab-Extraktion | [services/parserService.ts](../services/parserService.ts) |
 | Banner & Badges | [components/Dashboard.tsx](../components/Dashboard.tsx), [components/StudentCard.tsx](../components/StudentCard.tsx) |
-| Test-Harness (alle drei Klassen) | [tests/harness.ts](../tests/harness.ts) |
+| EGK-Semester-Matching (bipartit) | [services/parserService.ts](../services/parserService.ts) (`validateEgkSemesters`) |
+| Test-Harness (3 Modul-PDFs + ABU-Zeugnis) | [tests/harness.ts](../tests/harness.ts) |
