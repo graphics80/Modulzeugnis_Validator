@@ -27,13 +27,15 @@ interface Fixture {
   expected: {
     reports: number;
     pnabModules: number; // total modules marked Pnab across all reports
+    abuReports: number;  // reports carrying an ABU (Allgemeinbildung) section
+    egkReports: number;  // reports carrying an EGK (Erweiterte Grundkompetenzen) section
   };
 }
 
 const FIXTURES: Fixture[] = [
-  { label: 'Informatiker (IA23)', file: 'IA23 alle Klassen.pdf', curriculum: 'INFORMATIKER', expected: { reports: 42, pnabModules: 3 } },
-  { label: 'IMS (IM23)',          file: 'IM23 alle Klassen.pdf', curriculum: 'INFORMATIKER', expected: { reports: 28, pnabModules: 0 } },
-  { label: 'Mediamatiker (ME23)', file: 'ME23 alle Klassen.pdf', curriculum: 'MEDIAMATIKER', expected: { reports: 115, pnabModules: 4 } },
+  { label: 'Informatiker (IA23)', file: 'IA23 alle Klassen.pdf', curriculum: 'INFORMATIKER', expected: { reports: 42, pnabModules: 3, abuReports: 15, egkReports: 15 } },
+  { label: 'IMS (IM23)',          file: 'IM23 alle Klassen.pdf', curriculum: 'INFORMATIKER', expected: { reports: 28, pnabModules: 0, abuReports: 0, egkReports: 0 } },
+  { label: 'Mediamatiker (ME23)', file: 'ME23 alle Klassen.pdf', curriculum: 'MEDIAMATIKER', expected: { reports: 115, pnabModules: 4, abuReports: 0, egkReports: 0 } },
 ];
 
 const SEARCH_DIRS = [
@@ -100,6 +102,20 @@ for (const fixture of FIXTURES) {
   for (const p of pnabEntries) {
     console.log(`    · Pnab: ${p.name} (${p.classId}) — Modul ${p.moduleId}`);
   }
+
+  const abuReports = reports.filter(r => r.abu);
+  const egkReports = reports.filter(r => r.egk);
+  check(abuReports.length === fixture.expected.abuReports,
+    `${abuReports.length} Zeugnisse mit ABU-Abschnitt (erwartet ${fixture.expected.abuReports})`);
+  check(egkReports.length === fixture.expected.egkReports,
+    `${egkReports.length} Zeugnisse mit EGK-Abschnitt (erwartet ${fixture.expected.egkReports})`);
+
+  const abuInvalid = abuReports.filter(r => !r.abu!.isValid);
+  check(abuInvalid.length === 0,
+    `ABU-Durchschnitt validiert überall${abuInvalid.length ? ` — Abweichung bei: ${abuInvalid.slice(0, 5).map(r => `${r.name} (calc ${r.abu!.calculatedAverage} vs. ${r.abu!.printedAverage})`).join(', ')}` : ''}`);
+  const egkInvalid = egkReports.filter(r => !r.egk!.isValid);
+  check(egkInvalid.length === 0,
+    `EGK-Durchschnitt validiert überall${egkInvalid.length ? ` — Abweichung bei: ${egkInvalid.slice(0, 5).map(r => `${r.name} (calc ${r.egk!.calculatedAverage} vs. ${r.egk!.printedAverage})`).join(', ')}` : ''}`);
 }
 
 console.log(failures === 0 ? '\nAlle Tests bestanden ✓' : `\n${failures} Test(s) fehlgeschlagen ✗`);
