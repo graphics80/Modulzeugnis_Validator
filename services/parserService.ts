@@ -165,11 +165,14 @@ export const parseOCRText = (text: string): StudentReport[] => {
       const englishGrades = hasMathRow ? extractGradesBlock(lines, /Englisch/, /Mathematik/) : [];
       const mathGrades = hasMathRow ? extractGradesBlock(lines, /Mathematik/, /Semesterdurchschnitt/) : [];
 
-      // Hybrid per-semester validity: trust the natural column order first, and
-      // only fall back to the re-assignment check for the semesters it can't
-      // explain (see validateEgkSemesters). A semester that fails the natural
-      // order but survives re-assignment is "ambiguous" — surfaced for review
-      // rather than silently passed or hard-failed.
+      // Per-semester validity. Mathematik is a per-semester grade that isn't
+      // taught every semester, so its missing column is lost when the text is
+      // flattened and the natural column order is often wrong. A semester counts
+      // as correct if the printed average reconciles EITHER in natural order OR
+      // after re-assigning the year's Mathematik notes (see validateEgkSemesters):
+      // the reorder simply recovers the true columns, so it is not an error and
+      // not "unclear" — it is arithmetically correct. Only a semester that no
+      // assignment can explain is a real error.
       const matchingValid = validateEgkSemesters(englishGrades, mathGrades, semesterAvgGrades);
       const englishComplete = englishGrades.length === semesterAvgGrades.length && englishGrades.length > 0;
       const semesterResults: EgkSemesterResult[] = semesterAvgGrades.map((printedSem, k) => {
@@ -180,9 +183,7 @@ export const parseOCRText = (text: string): StudentReport[] => {
           status = 'valid'; // not checkable per-semester from the flattened text
         } else {
           const posCalc = math === undefined ? eng : round05((eng + math) / 2);
-          if (matchesPrinted(posCalc, printedSem)) status = 'valid';
-          else if (matchingValid[k]) status = 'ambiguous';
-          else status = 'invalid';
+          status = (matchesPrinted(posCalc, printedSem) || matchingValid[k]) ? 'valid' : 'invalid';
         }
         return { english: eng, math, printedSemAvg: printedSem, status, isValid: status !== 'invalid' };
       });
