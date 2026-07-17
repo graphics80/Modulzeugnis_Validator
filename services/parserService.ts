@@ -123,7 +123,10 @@ export const parseOCRText = (text: string): StudentReport[] => {
       }
 
       const egkCalced = round05(average(semesterResults.map(r => r.printedSemAvg)));
-      egkData = { printedAverage: egkPrintedAvg, calculatedAverage: egkCalced, isValid: matchesPrinted(egkCalced, egkPrintedAvg), semesterResults };
+      // Section is valid only when the overall average AND every printed
+      // semester average check out — a single wrong semester marks it invalid.
+      const egkValid = matchesPrinted(egkCalced, egkPrintedAvg) && semesterResults.every(r => r.isValid);
+      egkData = { printedAverage: egkPrintedAvg, calculatedAverage: egkCalced, isValid: egkValid, semesterResults };
     }
 
     // 3. Module Extraction (Overhauled for robust detection)

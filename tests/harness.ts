@@ -115,7 +115,10 @@ for (const fixture of FIXTURES) {
     `ABU-Durchschnitt validiert überall${abuInvalid.length ? ` — Abweichung bei: ${abuInvalid.slice(0, 5).map(r => `${r.name} (calc ${r.abu!.calculatedAverage} vs. ${r.abu!.printedAverage})`).join(', ')}` : ''}`);
   const egkInvalid = egkReports.filter(r => !r.egk!.isValid);
   check(egkInvalid.length === 0,
-    `EGK-Durchschnitt validiert überall${egkInvalid.length ? ` — Abweichung bei: ${egkInvalid.slice(0, 5).map(r => `${r.name} (calc ${r.egk!.calculatedAverage} vs. ${r.egk!.printedAverage})`).join(', ')}` : ''}`);
+    `EGK validiert überall (Gesamt + je Semester)${egkInvalid.length ? ` — Abweichung bei: ${egkInvalid.slice(0, 5).map(r => {
+      const badSems = r.egk!.semesterResults.map((s, i) => (s.isValid ? null : i + 1)).filter((n): n is number => n !== null);
+      return badSems.length ? `${r.name} (Semester ${badSems.join(', ')})` : `${r.name} (Gesamt calc ${r.egk!.calculatedAverage} vs. ${r.egk!.printedAverage})`;
+    }).join(', ')}` : ''}`);
 }
 
 console.log(failures === 0 ? '\nAlle Tests bestanden ✓' : `\n${failures} Test(s) fehlgeschlagen ✗`);

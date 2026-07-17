@@ -11,7 +11,8 @@ import {
   ClipboardDocumentCheckIcon,
   CheckIcon,
   CloudArrowUpIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 
 interface Props {
@@ -190,6 +191,46 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
                   <li key={report.id}>
                     <span className="font-medium">{report.name}</span>
                     <span className="text-orange-700"> ({report.classId}) — Modul{pnab.length > 1 ? 'e' : ''} {pnab.map(m => m.moduleId).join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ABU / EGK Validation Errors */}
+      {(() => {
+        const abuEgkErrors = reports
+          .map(r => {
+            const issues: string[] = [];
+            if (r.abu && !r.abu.isValid) {
+              issues.push(`ABU (berechnet ${formatGrade(r.abu.calculatedAverage)} vs. gedruckt ${formatGrade(r.abu.printedAverage)})`);
+            }
+            if (r.egk && !r.egk.isValid) {
+              const badSems = r.egk.semesterResults
+                .map((s, i) => (s.isValid ? null : i + 1))
+                .filter((n): n is number => n !== null);
+              issues.push(badSems.length
+                ? `EGK (Semester ${badSems.join(', ')})`
+                : `EGK (berechnet ${formatGrade(r.egk.calculatedAverage)} vs. gedruckt ${formatGrade(r.egk.printedAverage)})`);
+            }
+            return { report: r, issues };
+          })
+          .filter(e => e.issues.length > 0);
+        if (abuEgkErrors.length === 0) return null;
+        return (
+          <div className="mb-8 bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3">
+            <XCircleIcon className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-red-900">
+              <p className="font-semibold mb-1">
+                {abuEgkErrors.length} Zeugnis{abuEgkErrors.length > 1 ? 'se' : ''} mit ABU/EGK-Notenfehler
+              </p>
+              <ul className="space-y-0.5">
+                {abuEgkErrors.map(({ report, issues }) => (
+                  <li key={report.id}>
+                    <span className="font-medium">{report.name}</span>
+                    <span className="text-red-700"> ({report.classId}) — {issues.join(', ')}</span>
                   </li>
                 ))}
               </ul>
