@@ -57,6 +57,9 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
   }, [reports]);
 
   const curriculum = detectCurriculum(reports.length > 0 ? reports[0].profession : '');
+  // The separate ABU/EGK certificate carries no modules — a curriculum grid would
+  // show every module as "missing", so only render it when module grades exist.
+  const hasAnyModules = reports.some(r => r.hasModules);
 
   // Grades per module ID across all loaded reports, for the curriculum check
   const moduleGrades = useMemo(() => {
@@ -123,7 +126,7 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
       </div>
 
       {/* Curriculum Grid */}
-      {curriculum && (
+      {curriculum && hasAnyModules && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8 overflow-hidden">
           <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center">
