@@ -16,8 +16,10 @@ rsync -az --delete \
   ./ "$USER@$HOST:$APP_DIR/"
 
 echo "==> Rebuilding and restarting container"
+# --force-recreate: `docker compose up -d` alone can keep the old container
+# running when only the image content changed, silently shipping stale code.
 ssh -i "$SSH_KEY" "$USER@$HOST" \
-  "cd $APP_DIR && docker compose build && docker compose up -d && docker image prune -f"
+  "cd $APP_DIR && docker compose build && docker compose up -d --force-recreate && docker image prune -f"
 
 echo "==> Smoke test"
 sleep 2
