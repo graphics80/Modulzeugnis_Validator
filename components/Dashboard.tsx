@@ -12,7 +12,8 @@ import {
   CheckIcon,
   CloudArrowUpIcon,
   ArrowPathIcon,
-  XCircleIcon
+  XCircleIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 interface Props {
@@ -37,9 +38,9 @@ const TILE_STYLES: Record<TileStatus, { box: string; id: string; name: string }>
     name: 'text-gray-400',
   },
   missing: {
-    box: 'bg-white border-gray-100 text-gray-300',
-    id: 'text-gray-300',
-    name: 'text-gray-300/50',
+    box: 'bg-amber-50 border-amber-300 text-amber-900 ring-1 ring-amber-200',
+    id: 'text-amber-900',
+    name: 'text-amber-700',
   },
 };
 
@@ -68,6 +69,12 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
     });
     return grades;
   }, [reports]);
+
+  // Curriculum modules expected by the plan but absent from every loaded report
+  const missingModules = useMemo(() => {
+    if (!curriculum) return [] as string[];
+    return curriculum.plan.flatMap(s => s.modules).filter(id => moduleGrades[id] === undefined);
+  }, [curriculum, moduleGrades]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -123,9 +130,16 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
               <ClipboardDocumentCheckIcon className="w-5 h-5 mr-2 text-indigo-600" />
               CURRICULUM CHECK: {curriculum.label}
             </h3>
-            <span className="text-xs text-gray-500 font-medium">
-               Verifying document content against expected semester plan
-            </span>
+            {missingModules.length > 0 ? (
+              <span className="text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded-full px-3 py-1 flex items-center gap-1">
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                {missingModules.length} Modul{missingModules.length > 1 ? 'e' : ''} fehlen: {missingModules.join(', ')}
+              </span>
+            ) : (
+              <span className="text-xs text-gray-500 font-medium">
+                 Verifying document content against expected semester plan
+              </span>
+            )}
           </div>
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {curriculum.plan.map((semBlock) => (
@@ -148,9 +162,11 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
                          <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center border-2 transition-colors ${
                              isMentioned
                               ? 'bg-green-500 border-green-500 text-white'
-                              : 'bg-transparent border-gray-200'
+                              : 'bg-amber-500 border-amber-500 text-white'
                          }`}>
-                             {isMentioned && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
+                             {isMentioned
+                               ? <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />
+                               : <XMarkIcon className="w-2.5 h-2.5 stroke-[3]" />}
                          </div>
                          <div className="min-w-0 flex-1">
                            <div className="flex justify-between items-baseline gap-1">
@@ -233,6 +249,40 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
                   <li key={report.id}>
                     <span className="font-medium">{report.name}</span>
                     <span className="text-red-700"> ({report.classId}) — {issues.join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* EGK ambiguous semesters — printed average only reconciles by re-sorting Mathematik */}
+      {(() => {
+        const ambiguous = reports
+          .map(r => {
+            const sems = r.egk
+              ? r.egk.semesterResults.map((s, i) => (s.status === 'ambiguous' ? i + 1 : null)).filter((n): n is number => n !== null)
+              : [];
+            return { report: r, sems };
+          })
+          .filter(e => e.sems.length > 0);
+        if (ambiguous.length === 0) return null;
+        return (
+          <div className="mb-8 bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
+            <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-amber-900">
+              <p className="font-semibold mb-1">
+                {ambiguous.length} Zeugnis{ambiguous.length > 1 ? 'se' : ''} mit unklarem EGK-Semester (bitte prüfen)
+              </p>
+              <p className="text-xs text-amber-700 mb-1">
+                Gedruckter Semesterdurchschnitt geht in natürlicher Spaltenreihenfolge nicht auf, ist aber durch Umsortieren der jahresweise benoteten Mathematik-Noten erklärbar.
+              </p>
+              <ul className="space-y-0.5">
+                {ambiguous.map(({ report, sems }) => (
+                  <li key={report.id}>
+                    <span className="font-medium">{report.name}</span>
+                    <span className="text-amber-700"> ({report.classId}) — Semester {sems.join(', ')}</span>
                   </li>
                 ))}
               </ul>

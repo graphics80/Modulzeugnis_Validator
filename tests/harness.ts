@@ -122,9 +122,18 @@ for (const fixture of FIXTURES) {
   const egkInvalid = egkReports.filter(r => !r.egk!.isValid);
   check(egkInvalid.length === 0,
     `EGK validiert überall (Gesamt + je Semester)${egkInvalid.length ? ` — Abweichung bei: ${egkInvalid.slice(0, 5).map(r => {
-      const badSems = r.egk!.semesterResults.map((s, i) => (s.isValid ? null : i + 1)).filter((n): n is number => n !== null);
+      const badSems = r.egk!.semesterResults.map((s, i) => (s.status !== 'invalid' ? null : i + 1)).filter((n): n is number => n !== null);
       return badSems.length ? `${r.name} (Semester ${badSems.join(', ')})` : `${r.name} (Gesamt calc ${r.egk!.calculatedAverage} vs. ${r.egk!.printedAverage})`;
     }).join(', ')}` : ''}`);
+
+  // Ambiguous semesters are not failures, but must stay visible for human review.
+  const egkAmbiguous = egkReports.filter(r => r.egk!.semesterResults.some(s => s.status === 'ambiguous'));
+  if (egkAmbiguous.length) {
+    console.log(`  ⚠ ${egkAmbiguous.length} Zeugnis(se) mit unklarem EGK-Semester (nur umsortiert erklärbar): ${egkAmbiguous.slice(0, 5).map(r => {
+      const sems = r.egk!.semesterResults.map((s, i) => (s.status === 'ambiguous' ? i + 1 : null)).filter((n): n is number => n !== null);
+      return `${r.name} (S${sems.join(',')})`;
+    }).join(', ')}`);
+  }
 }
 
 console.log(failures === 0 ? '\nAlle Tests bestanden ✓' : `\n${failures} Test(s) fehlgeschlagen ✗`);

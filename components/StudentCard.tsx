@@ -82,15 +82,17 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
   const abuInvalid = !!student.abu && !student.abu.isValid;
   const egkInvalid = !!student.egk && !student.egk.isValid;
   const abuEgkInvalid = abuInvalid || egkInvalid;
+  // Semester only explainable by re-sorting the year-graded Mathematik columns.
+  const egkAmbiguous = !!student.egk?.semesterResults.some(r => r.status === 'ambiguous');
   // EGK subject rows only carry meaning for the Informatiker layout (Englisch +
   // Mathematik); the Mediamatiker certificate is validated on the semester average.
   const egkHasSubjects = !!student.egk?.semesterResults.some(r => r.english !== undefined || r.math !== undefined);
 
-  // ABU/EGK errors take visual precedence over Pnab in the list highlight.
+  // Hard errors (red) win over ambiguous/Pnab (amber) in the list highlight.
   const ringClass = abuEgkInvalid
     ? 'border-red-400 ring-2 ring-red-200'
-    : pnabModules.length > 0
-      ? 'border-orange-400 ring-2 ring-orange-200'
+    : (egkAmbiguous || pnabModules.length > 0)
+      ? 'border-amber-400 ring-2 ring-amber-200'
       : 'border-gray-200';
 
   const handleOpenPdf = async (e: React.MouseEvent) => {
@@ -146,11 +148,11 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
 
             {student.egk && (
               <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold ${
-                egkInvalid ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-              }`} title="Erweiterte Grundkompetenzen">
+                egkInvalid ? 'bg-red-100 text-red-800' : egkAmbiguous ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+              }`} title={egkAmbiguous ? 'EGK: Semester nur durch Umsortieren der Mathematik-Noten erklärbar — prüfen' : 'Erweiterte Grundkompetenzen'}>
                 <span>EGK: {formatGrade(student.egk.printedAverage)}</span>
                 {egkInvalid && <span className="text-xs opacity-75">(Calc: {formatGrade(student.egk.calculatedAverage)})</span>}
-                {egkInvalid ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
+                {egkInvalid ? <XCircleIcon className="w-4 h-4" /> : egkAmbiguous ? <ExclamationTriangleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
               </div>
             )}
 
@@ -228,7 +230,11 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
                             label: egkHasSubjects ? 'Avg' : 'Sem-Ø',
                             className: 'border-t border-gray-200 font-medium bg-white',
                             cell: (r: EgkSemesterResult, i: number) => (
-                              <td key={i} className={`px-1 ${r.isValid ? 'text-green-600' : 'text-red-600 bg-red-50'}`}>
+                              <td key={i} className={`px-1 ${
+                                r.status === 'invalid' ? 'text-red-600 bg-red-50'
+                                : r.status === 'ambiguous' ? 'text-amber-700 bg-amber-50'
+                                : 'text-green-600'
+                              }`} title={r.status === 'ambiguous' ? 'Nur durch Umsortieren der Mathematik-Noten erklärbar' : undefined}>
                                 {formatGrade(r.printedSemAvg)}
                               </td>
                             ),
