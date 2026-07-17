@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { parseOCRText } from './services/parserService';
-import { extractTextFromPDF } from './services/pdfService';
+import { extractTextFromPDF, disposeSliceCache } from './services/pdfService';
 import { StudentReport } from './types';
 import Dashboard from './components/Dashboard';
 import DropZone from './components/DropZone';
@@ -49,7 +49,7 @@ const App: React.FC = () => {
         pdfBuffer={pdfBuffer}
         isProcessing={isProcessing}
         onNewFile={processFile}
-        onReset={() => { setReports([]); setPdfBuffer(null); }}
+        onReset={() => { setReports([]); setPdfBuffer(null); disposeSliceCache(); }}
       />
     );
   }
@@ -83,15 +83,11 @@ const App: React.FC = () => {
           {(isDragging) => (
             <>
               <div className={`transition-transform duration-300 ${isDragging ? 'scale-110' : 'scale-100'}`}>
-                {isProcessing ? (
-                   <div className="p-4 bg-indigo-50 rounded-full mb-4">
-                     <ArrowPathIcon className="w-12 h-12 text-indigo-600 animate-spin" />
-                   </div>
-                ) : (
-                   <div className="p-4 bg-indigo-50 rounded-full mb-4 group-hover:bg-indigo-100 transition-colors">
-                     <CloudArrowUpIcon className="w-12 h-12 text-indigo-600" />
-                   </div>
-                )}
+                <div className={`p-4 bg-indigo-50 rounded-full mb-4 ${isProcessing ? '' : 'group-hover:bg-indigo-100 transition-colors'}`}>
+                  {isProcessing
+                    ? <ArrowPathIcon className="w-12 h-12 text-indigo-600 animate-spin" />
+                    : <CloudArrowUpIcon className="w-12 h-12 text-indigo-600" />}
+                </div>
               </div>
 
               <h3 className="text-xl font-semibold text-gray-900 mb-2">

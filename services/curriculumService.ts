@@ -1,4 +1,4 @@
-export interface SemesterBlock {
+interface SemesterBlock {
   semester: number;
   modules: string[];
 }

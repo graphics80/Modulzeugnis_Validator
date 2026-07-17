@@ -1,4 +1,4 @@
-import { StudentReport, ModuleGrade, AbuData, EgkData, EgkSemesterResult, AbuSemesterResult, SemesterStatus } from '../types';
+import { StudentReport, ModuleGrade, AbuData, EgkData, EgkSemesterResult, AbuSemesterResult } from '../types';
 import { average, isFailing, isGraded, matchesPrinted, round01, round05, MODULE_AVG_TOLERANCE } from '../utils/grades';
 
 // Swiss grade token: 1.0–6.0 in half-grade steps.
@@ -167,32 +167,29 @@ export const parseOCRText = (text: string): StudentReport[] => {
 
       // Per-semester validity. Mathematik is a per-semester grade that isn't
       // taught every semester, so its missing column is lost when the text is
-      // flattened and the natural column order is often wrong. A semester counts
-      // as correct if the printed average reconciles EITHER in natural order OR
+      // flattened and the natural column order is often wrong. A semester is
+      // valid when the printed average reconciles EITHER in natural order OR
       // after re-assigning the year's Mathematik notes (see validateEgkSemesters):
-      // the reorder simply recovers the true columns, so it is not an error and
-      // not "unclear" — it is arithmetically correct. Only a semester that no
-      // assignment can explain is a real error.
+      // the reorder recovers the true columns, so it is arithmetically correct.
+      // Only a semester that no assignment can explain is a real error.
       const matchingValid = validateEgkSemesters(englishGrades, mathGrades, semesterAvgGrades);
       const englishComplete = englishGrades.length === semesterAvgGrades.length && englishGrades.length > 0;
       const semesterResults: EgkSemesterResult[] = semesterAvgGrades.map((printedSem, k) => {
         const eng = englishGrades[k];
         const math = mathGrades[k];
-        let status: SemesterStatus;
-        if (!englishComplete || eng === undefined) {
-          status = 'valid'; // not checkable per-semester from the flattened text
-        } else {
+        // Not checkable per-semester from the flattened text → assume valid.
+        let isValid = true;
+        if (englishComplete && eng !== undefined) {
           const posCalc = math === undefined ? eng : round05((eng + math) / 2);
-          status = (matchesPrinted(posCalc, printedSem) || matchingValid[k]) ? 'valid' : 'invalid';
+          isValid = matchesPrinted(posCalc, printedSem) || matchingValid[k];
         }
-        return { english: eng, math, printedSemAvg: printedSem, status, isValid: status !== 'invalid' };
+        return { english: eng, math, printedSemAvg: printedSem, isValid };
       });
 
       const egkCalced = round05(average(semesterAvgGrades));
-      // Section is hard-invalid only when the overall average disagrees or a
-      // semester can't be explained at all; ambiguous semesters stay valid here
-      // and are flagged separately in the UI.
-      const egkValid = matchesPrinted(egkCalced, egkPrintedAvg) && semesterResults.every(r => r.status !== 'invalid');
+      // Section is invalid when the overall average disagrees or any semester
+      // can't be explained by any assignment of the printed grades.
+      const egkValid = matchesPrinted(egkCalced, egkPrintedAvg) && semesterResults.every(r => r.isValid);
       egkData = { printedAverage: egkPrintedAvg, calculatedAverage: egkCalced, isValid: egkValid, semesterResults };
     }
 

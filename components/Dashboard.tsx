@@ -57,9 +57,6 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
   }, [reports]);
 
   const curriculum = detectCurriculum(reports.length > 0 ? reports[0].profession : '');
-  // The separate ABU/EGK certificate carries no modules — a curriculum grid would
-  // show every module as "missing", so only render it when module grades exist.
-  const hasAnyModules = reports.some(r => r.hasModules);
 
   // Grades per module ID across all loaded reports, for the curriculum check
   const moduleGrades = useMemo(() => {
@@ -125,8 +122,9 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
         </div>
       </div>
 
-      {/* Curriculum Grid */}
-      {curriculum && hasAnyModules && (
+      {/* Curriculum Grid — the separate ABU/EGK certificate carries no modules
+          (every tile would read "missing"), so only render it when grades exist. */}
+      {curriculum && stats.moduleCount > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8 overflow-hidden">
           <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center">
@@ -260,40 +258,6 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
         );
       })()}
 
-      {/* EGK ambiguous semesters — printed average only reconciles by re-sorting Mathematik */}
-      {(() => {
-        const ambiguous = reports
-          .map(r => {
-            const sems = r.egk
-              ? r.egk.semesterResults.map((s, i) => (s.status === 'ambiguous' ? i + 1 : null)).filter((n): n is number => n !== null)
-              : [];
-            return { report: r, sems };
-          })
-          .filter(e => e.sems.length > 0);
-        if (ambiguous.length === 0) return null;
-        return (
-          <div className="mb-8 bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
-            <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-amber-900">
-              <p className="font-semibold mb-1">
-                {ambiguous.length} Zeugnis{ambiguous.length > 1 ? 'se' : ''} mit unklarem EGK-Semester (bitte prüfen)
-              </p>
-              <p className="text-xs text-amber-700 mb-1">
-                Gedruckter Semesterdurchschnitt geht in natürlicher Spaltenreihenfolge nicht auf, ist aber durch Umsortieren der jahresweise benoteten Mathematik-Noten erklärbar.
-              </p>
-              <ul className="space-y-0.5">
-                {ambiguous.map(({ report, sems }) => (
-                  <li key={report.id}>
-                    <span className="font-medium">{report.name}</span>
-                    <span className="text-amber-700"> ({report.classId}) — Semester {sems.join(', ')}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center">
@@ -312,7 +276,7 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
             </div>
             <div>
                 <p className="text-sm text-gray-500 font-medium">Calc Average</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.moduleCount > 0 ? stats.globalAvg.toFixed(2) : '—'}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.moduleCount > 0 ? formatGrade(stats.globalAvg, 2) : '—'}</p>
             </div>
         </div>
 

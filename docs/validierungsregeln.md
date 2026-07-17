@@ -107,42 +107,33 @@ listet (Englisch, Französisch, Betriebskommunikation, Marketingfachsprache)
 statt Englisch/Mathematik. Der Validator erkennt solche Zeugnisse ohne
 Modulnoten, unterdrückt den Modul-Durchschnitt und prüft nur ABU/EGK.
 
-### Semesterzuordnung und Hybrid-Prüfung je Semester
+### Semesterzuordnung je Semester
 
 Prüfung 1 braucht die Zuordnung Fachnote → Semester; die entsteht aus der
 Spaltenreihenfolge von links. Ein jahresweise benotetes Fach (z. B. Mathematik)
 liefert nicht in jedem Semester eine Note, und **welches** Semester fehlt, geht
-beim Flachklopfen des PDF-Textes verloren. Darum drei Ausgänge je Semester:
+beim Flachklopfen des PDF-Textes verloren — die natürliche Reihenfolge ist dann
+falsch. Ein Semester gilt darum als **gültig**, wenn der gedruckte
+Semesterdurchschnitt entweder in natürlicher Spaltenreihenfolge aufgeht **oder**
+nach einer gültigen Umsortierung der Mathematik-Spalten (bipartites Matching).
+Die Umsortierung stellt nur die verlorenen Spalten wieder her; das Ergebnis ist
+rechnerisch korrekt. **Ungültig** ist ein Semester nur, wenn keine Zuordnung der
+gedruckten Noten den Semesterdurchschnitt erklärt.
 
-- **gültig** — der gedruckte Semesterdurchschnitt geht in natürlicher
-  Spaltenreihenfolge auf.
-- **unklar** — die natürliche Reihenfolge geht *nicht* auf, aber es existiert
-  eine gültige Umsortierung der Mathematik-Spalten, die ihn erklärt (bipartites
-  Matching). Ein einzelner Notenfehler, der global konsistent bleibt, landet
-  hier: **amber markiert zur manuellen Prüfung**, weder still durchgewunken noch
-  hart als Fehler gewertet.
-- **ungültig** — keine Zuordnung der gedruckten Noten erklärt den
-  Semesterdurchschnitt → harter Fehler.
-
-Der EGK-Bereich ist **hart ungültig**, wenn der Gesamtschnitt abweicht oder ein
-Semester *ungültig* ist. *Unklare* Semester lassen den Bereich gültig, werden
-aber separat (amber) hervorgehoben. Fehlt die vollständige Englisch-Zeile oder
-kommen keine Fachnoten vor (Mediamatiker), entfällt Prüfung 1 — die robuste
-**Prüfung 2** (Mittel der gedruckten Semesterdurchschnitte) greift immer.
+Der EGK-Bereich ist ungültig, wenn der Gesamtschnitt abweicht oder ein Semester
+ungültig ist. Fehlt die vollständige Englisch-Zeile oder kommen keine Fachnoten
+vor (Mediamatiker), entfällt Prüfung 1 — die robuste **Prüfung 2** (Mittel der
+gedruckten Semesterdurchschnitte) greift immer.
 
 ---
 
 ## 6. Was im UI angezeigt wird
 
-- **Rotes Banner (ABU/EGK):** listet jedes Zeugnis mit hartem ABU- oder
-  EGK-Notenfehler, inkl. betroffenem Bereich und — bei EGK — betroffenem
-  Semester.
-- **Amber Banner (EGK unklar):** listet Zeugnisse mit *unklarem* EGK-Semester
-  (nur durch Umsortieren erklärbar) zur manuellen Prüfung.
+- **Rotes Banner (ABU/EGK):** listet jedes Zeugnis mit ABU- oder EGK-Notenfehler,
+  inkl. betroffenem Bereich und — bei EGK — betroffenem Semester.
 - **Oranges Banner (Pnab):** listet Zeugnisse mit «Prüfung nicht absolviert».
-- **Studenten-Karte:** grün/amber/rot je Bereich; EGK-Semesterzellen grün
-  (gültig) / amber (unklar) / rot (ungültig); Karte bekommt einen roten Ring
-  bei hartem Fehler, amber bei unklar/Pnab.
+- **Studenten-Karte:** grün/rot je Bereich; EGK-Semesterzellen grün (gültig) /
+  rot (ungültig); Karte bekommt einen roten Ring bei ABU/EGK-Fehler, orange bei Pnab.
 - **Curriculum-Check:** Rasterabgleich der belegten Module gegen den Lehrplan;
   **fehlende** (im Dokument nicht vorkommende) Module amber mit ✗ und
   Zähler-Badge, statt blass ausgegraut.

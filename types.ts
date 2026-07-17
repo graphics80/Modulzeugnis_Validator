@@ -21,18 +21,14 @@ export interface AbuSemesterResult {
 
 export type AbuData = GradeSection<AbuSemesterResult>;
 
-// valid = printed semester average reconciles in natural column order;
-// ambiguous = only reconciles by re-assigning the year-graded Mathematik columns
-// (natural order fails but a consistent pairing exists) → flag for human review;
-// invalid = no assignment of the printed grades explains the semester average.
-export type SemesterStatus = 'valid' | 'ambiguous' | 'invalid';
-
 export interface EgkSemesterResult {
   english?: number;
   math?: number;
   printedSemAvg: number;
-  status: SemesterStatus;
-  isValid: boolean; // hard validity, i.e. status !== 'invalid'
+  // Valid when the printed semester average reconciles in natural column order
+  // OR after re-assigning the year-graded Mathematik columns; invalid when no
+  // assignment of the printed grades explains it.
+  isValid: boolean;
 }
 
 export type EgkData = GradeSection<EgkSemesterResult>;
