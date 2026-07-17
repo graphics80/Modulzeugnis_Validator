@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" font-family="-apple-system, Segoe UI, Roboto, sans-serif">
+  <rect width="760" height="470" fill="#ffffff"/>
+  <text x="24" y="34" font-size="18" font-weight="700" fill="#111827">EGK-Durchschnitt (Erweiterte Grundkompetenzen)</text>
+
+  <!-- Section header + overall -->
+  <text x="24" y="78" font-size="13" font-weight="700" fill="#374151">Erweiterte Grundkompetenzen</text>
+  <text x="690" y="78" font-size="13" font-weight="700" fill="#111827">5.5</text>
+  <text x="600" y="78" font-size="11" fill="#6b7280">gedruckt</text>
+
+  <!-- semester columns S1..S5 -->
+  <g font-size="12" fill="#9ca3af" text-anchor="middle">
+    <text x="380" y="104">S1</text><text x="450" y="104">S2</text><text x="520" y="104">S3</text>
+    <text x="590" y="104">S4</text><text x="660" y="104">S5</text>
+  </g>
+
+  <!-- Englisch -->
+  <text x="24" y="130" font-size="13" fill="#374151">AB23c Englisch</text>
+  <g font-size="13" fill="#111827" text-anchor="middle">
+    <text x="380" y="130">5.5</text><text x="450" y="130">5.5</text><text x="520" y="130">5.5</text>
+    <text x="590" y="130">5.0</text><text x="660" y="130">6.0</text>
+  </g>
+
+  <!-- Mathematik (only first 3 semesters) -->
+  <text x="24" y="156" font-size="13" fill="#374151">AB23c Mathematik</text>
+  <g font-size="13" fill="#111827" text-anchor="middle">
+    <text x="380" y="156">4.5</text><text x="450" y="156">5.5</text><text x="520" y="156">5.0</text>
+    <text x="590" y="156" fill="#d1d5db">—</text><text x="660" y="156" fill="#d1d5db">—</text>
+  </g>
+
+  <line x1="24" y1="172" x2="736" y2="172" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Semesterdurchschnitt printed -->
+  <text x="24" y="194" font-size="13" font-weight="700" fill="#374151">Semesterdurchschnitt EGK</text>
+  <g font-size="13" font-weight="700" fill="#111827" text-anchor="middle">
+    <text x="380" y="194">5.0</text><text x="450" y="194">5.5</text><text x="520" y="194">5.5</text>
+    <text x="590" y="194">5.0</text><text x="660" y="194">6.0</text>
+  </g>
+
+  <!-- Check 1: per-semester -->
+  <text x="24" y="238" font-size="14" font-weight="700" fill="#111827">Prüfung 1 — je Semester: Mittel(Englisch, Mathematik) → 0.5</text>
+  <g font-size="12" fill="#4b5563" font-family="ui-monospace, monospace">
+    <text x="24" y="262">S1: (5.5+4.5)/2 = 5.0   → 5.0 = 5.0  ✓</text>
+    <text x="24" y="282">S2: (5.5+5.5)/2 = 5.5   → 5.5 = 5.5  ✓</text>
+    <text x="24" y="302">S3: (5.5+5.0)/2 = 5.25  → 5.5 = 5.5  ✓</text>
+    <text x="24" y="322">S4: nur Englisch 5.0    → 5.0 = 5.0  ✓</text>
+    <text x="24" y="342">S5: nur Englisch 6.0    → 6.0 = 6.0  ✓</text>
+  </g>
+  <text x="470" y="282" font-size="11" fill="#6b7280">Fächer mit Jahresnote</text>
+  <text x="470" y="298" font-size="11" fill="#6b7280">liefern nicht jedes</text>
+  <text x="470" y="314" font-size="11" fill="#6b7280">Semester eine Note.</text>
+
+  <line x1="24" y1="362" x2="736" y2="362" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Check 2: overall -->
+  <text x="24" y="388" font-size="14" font-weight="700" fill="#111827">Prüfung 2 — Gesamt: Mittel der Semesterdurchschnitte → 0.5</text>
+  <text x="24" y="414" font-size="12" fill="#4b5563" font-family="ui-monospace, monospace">(5.0+5.5+5.5+5.0+6.0)/5 = 5.4  →  runden auf 0.5  →  5.5</text>
+
+  <!-- Result badge -->
+  <rect x="24" y="430" width="712" height="30" rx="8" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="38" y="450" font-size="12" font-weight="700" fill="#047857">✓ gültig</text>
+  <text x="110" y="450" font-size="12" fill="#065f46">alle Semesterdurchschnitte stimmen und Gesamt berechnet 5.5 = gedruckt 5.5</text>
+</svg>
