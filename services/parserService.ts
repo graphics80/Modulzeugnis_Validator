@@ -1,4 +1,4 @@
-import { StudentReport, ModuleGrade, AbuData, EgkData, EgkSemesterResult, AbuSemesterResult } from '../types';
+import { StudentReport, ModuleGrade, AbuData, EgkData, EgkSemesterResult, AbuSemesterResult, SemesterStatus } from '../types';
 import { average, isFailing, isGraded, matchesPrinted, round01, round05, MODULE_AVG_TOLERANCE } from '../utils/grades';
 
 // Swiss grade token: 1.0–6.0 in half-grade steps.
@@ -44,6 +44,50 @@ const extractGradesBlock = (lines: string[], startLabelRegex: RegExp, stopLabelR
         }
     }
     return grades;
+};
+
+// EGK per-semester validation, position-independent.
+//
+// Englisch is graded every semester, so its flat-text order maps cleanly to the
+// semester columns. Mathematik is also a per-semester grade, but it is not taught
+// in every semester, so it carries fewer values than Englisch — and which semester
+// it skips is lost when the PDF text layer is flattened (empty cells leave no
+// marker). Pairing Englisch and Mathematik by index therefore misaligns every
+// semester after the gap and falsely flags correct certificates.
+//
+// Instead: a printed semester average must be reachable from that semester's
+// Englisch grade either alone (no Mathematik that semester) or combined with
+// exactly one of the available Mathematik grades. Each Mathematik grade may back
+// only one semester — enforced with a bipartite matching (Kuhn's algorithm) — so
+// a semester is invalid only when no assignment can reconcile it.
+const validateEgkSemesters = (english: number[], math: number[], printedAvg: number[]): boolean[] => {
+  const n = printedAvg.length;
+  // Without a complete Englisch row we can't pin each semester → not checkable.
+  if (english.length !== n) return printedAvg.map(() => true);
+
+  // Semesters not explained by Englisch alone must each claim a distinct Mathematik grade.
+  const needMath: number[] = [];
+  printedAvg.forEach((avg, i) => { if (!matchesPrinted(english[i], avg)) needMath.push(i); });
+
+  const candidates = needMath.map(i =>
+    math.map((m, mi) => (matchesPrinted(round05((english[i] + m) / 2), printedAvg[i]) ? mi : -1)).filter(mi => mi >= 0)
+  );
+
+  const matchOf: number[] = new Array(math.length).fill(-1); // math index → needMath slot
+  const assign = (s: number, seen: boolean[]): boolean => {
+    for (const mi of candidates[s]) {
+      if (seen[mi]) continue;
+      seen[mi] = true;
+      if (matchOf[mi] === -1 || assign(matchOf[mi], seen)) { matchOf[mi] = s; return true; }
+    }
+    return false;
+  };
+
+  const valid = printedAvg.map(() => true);
+  needMath.forEach((sem, s) => {
+    if (!assign(s, new Array(math.length).fill(false))) valid[sem] = false;
+  });
+  return valid;
 };
 
 export const parseOCRText = (text: string): StudentReport[] => {
@@ -113,8 +157,7 @@ export const parseOCRText = (text: string): StudentReport[] => {
       const semesterAvgGrades = extractGradesBlock(lines, /Semesterdurchschnitt EGK/, /Sport|Wirtschaft|Durchschnitt/);
 
       // Per-semester subject recomputation only holds for the Informatiker layout
-      // (Englisch + Mathematik, both starting in semester 1 → index-based pairing
-      // is correct). Mediamatiker EGK lists more subjects (Französisch,
+      // (Englisch + Mathematik). Mediamatiker EGK lists more subjects (Französisch,
       // Betriebskommunikation, Marketingfachsprache) that begin in different
       // semesters; their columns can't be recovered from the flat text layer, so
       // only the overall average (mean of the printed semester averages) is checked.
@@ -122,20 +165,33 @@ export const parseOCRText = (text: string): StudentReport[] => {
       const englishGrades = hasMathRow ? extractGradesBlock(lines, /Englisch/, /Mathematik/) : [];
       const mathGrades = hasMathRow ? extractGradesBlock(lines, /Mathematik/, /Semesterdurchschnitt/) : [];
 
+      // Hybrid per-semester validity: trust the natural column order first, and
+      // only fall back to the re-assignment check for the semesters it can't
+      // explain (see validateEgkSemesters). A semester that fails the natural
+      // order but survives re-assignment is "ambiguous" — surfaced for review
+      // rather than silently passed or hard-failed.
+      const matchingValid = validateEgkSemesters(englishGrades, mathGrades, semesterAvgGrades);
+      const englishComplete = englishGrades.length === semesterAvgGrades.length && englishGrades.length > 0;
       const semesterResults: EgkSemesterResult[] = semesterAvgGrades.map((printedSem, k) => {
         const eng = englishGrades[k];
         const math = mathGrades[k];
-        let calc: number | undefined;
-        if (eng !== undefined && math !== undefined) calc = round05((eng + math) / 2);
-        else if (eng !== undefined || math !== undefined) calc = eng ?? math;
-        // calc undefined → Mediamatiker semester: not independently checkable here
-        return { english: eng, math, printedSemAvg: printedSem, isValid: calc === undefined ? true : matchesPrinted(calc, printedSem) };
+        let status: SemesterStatus;
+        if (!englishComplete || eng === undefined) {
+          status = 'valid'; // not checkable per-semester from the flattened text
+        } else {
+          const posCalc = math === undefined ? eng : round05((eng + math) / 2);
+          if (matchesPrinted(posCalc, printedSem)) status = 'valid';
+          else if (matchingValid[k]) status = 'ambiguous';
+          else status = 'invalid';
+        }
+        return { english: eng, math, printedSemAvg: printedSem, status, isValid: status !== 'invalid' };
       });
 
       const egkCalced = round05(average(semesterAvgGrades));
-      // Section is valid only when the overall average AND every checkable
-      // semester average agree — a single wrong semester marks it invalid.
-      const egkValid = matchesPrinted(egkCalced, egkPrintedAvg) && semesterResults.every(r => r.isValid);
+      // Section is hard-invalid only when the overall average disagrees or a
+      // semester can't be explained at all; ambiguous semesters stay valid here
+      // and are flagged separately in the UI.
+      const egkValid = matchesPrinted(egkCalced, egkPrintedAvg) && semesterResults.every(r => r.status !== 'invalid');
       egkData = { printedAverage: egkPrintedAvg, calculatedAverage: egkCalced, isValid: egkValid, semesterResults };
     }
 
