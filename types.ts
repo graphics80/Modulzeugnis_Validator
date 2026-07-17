@@ -1,9 +1,16 @@
-
 export interface ModuleGrade {
   semester: string;
   moduleId: string;
   moduleName: string;
-  grade?: number; // Made optional to support modules present in PDF but not yet graded
+  grade?: number; // Absent when the module appears in the PDF but is not yet graded
+}
+
+// Shared shape of a validated grade section (ABU, EGK, ...)
+export interface GradeSection<T> {
+  printedAverage: number;
+  calculatedAverage: number;
+  isValid: boolean;
+  semesterResults: T[];
 }
 
 export interface AbuSemesterResult {
@@ -11,27 +18,16 @@ export interface AbuSemesterResult {
   gesellschaft?: number;
 }
 
-export interface AbuData {
-  printedAverage: number;
-  calculatedAverage: number;
-  isValid: boolean;
-  semesterResults: AbuSemesterResult[];
-}
+export type AbuData = GradeSection<AbuSemesterResult>;
 
 export interface EgkSemesterResult {
   english?: number;
   math?: number;
   printedSemAvg: number;
-  calculatedSemAvg: number;
   isValid: boolean;
 }
 
-export interface EgkData {
-  printedAverage: number;
-  calculatedAverage: number;
-  isValid: boolean;
-  semesterResults: EgkSemesterResult[];
-}
+export type EgkData = GradeSection<EgkSemesterResult>;
 
 export interface StudentReport {
   id: string; // Unique ID usually derived from name
@@ -45,21 +41,7 @@ export interface StudentReport {
   calculatedAverage: number;
   isValidAverage: boolean;
   failingModules: ModuleGrade[];
-  rawText: string;
   pageNumber: number; // 1-based page number in the original PDF
   abu?: AbuData;
   egk?: EgkData;
-}
-
-export interface ValidationSummary {
-  totalStudents: number;
-  validReports: number;
-  flaggedReports: number;
-  averageGradeOverall: number;
-}
-
-export enum ValidationStatus {
-  VALID = 'VALID',
-  WARNING = 'WARNING',
-  ERROR = 'ERROR'
 }
