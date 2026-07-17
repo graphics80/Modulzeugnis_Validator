@@ -70,11 +70,22 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
     return grades;
   }, [reports]);
 
-  // Curriculum modules expected by the plan but absent from every loaded report
-  const missingModules = useMemo(() => {
-    if (!curriculum) return [] as string[];
-    return curriculum.plan.flatMap(s => s.modules).filter(id => moduleGrades[id] === undefined);
-  }, [curriculum, moduleGrades]);
+  // Curriculum modules the plan expects but a class never lists — computed PER
+  // class, because two classes in one file can differ (e.g. IMS IM25 a lists 426
+  // but IM25 b does not). An aggregate check lets one class mask another's gap.
+  const missingByClass = useMemo(() => {
+    if (!curriculum) return [] as { classId: string; missing: string[] }[];
+    const planIds = curriculum.plan.flatMap(s => s.modules);
+    const byClass = new Map<string, Set<string>>();
+    for (const r of reports) {
+      let ids = byClass.get(r.classId);
+      if (!ids) { ids = new Set(); byClass.set(r.classId, ids); }
+      r.modules.forEach(m => ids!.add(m.moduleId));
+    }
+    return [...byClass.entries()]
+      .map(([classId, ids]) => ({ classId, missing: planIds.filter(id => !ids.has(id)) }))
+      .filter(e => e.missing.length > 0);
+  }, [curriculum, reports]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -131,11 +142,15 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
               <ClipboardDocumentCheckIcon className="w-5 h-5 mr-2 text-indigo-600" />
               CURRICULUM CHECK: {curriculum.label}
             </h3>
-            {missingModules.length > 0 ? (
-              <span className="text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded-full px-3 py-1 flex items-center gap-1">
-                <ExclamationTriangleIcon className="w-4 h-4" />
-                {missingModules.length} Modul{missingModules.length > 1 ? 'e' : ''} fehlen: {missingModules.join(', ')}
-              </span>
+            {missingByClass.length > 0 ? (
+              <div className="flex flex-col items-end gap-1">
+                {missingByClass.map(({ classId, missing }) => (
+                  <span key={classId} className="text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded-full px-3 py-1 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="w-4 h-4" />
+                    {classId}: Modul{missing.length > 1 ? 'e' : ''} {missing.join(', ')} {missing.length > 1 ? 'fehlen' : 'fehlt'}
+                  </span>
+                ))}
+              </div>
             ) : (
               <span className="text-xs text-gray-500 font-medium">
                  Verifying document content against expected semester plan
