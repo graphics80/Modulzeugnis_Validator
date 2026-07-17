@@ -67,7 +67,12 @@ export const parseOCRText = (text: string): StudentReport[] => {
     const dob = firstMatch(page, [/Geburtsdatum\s+(\d{2}\.\d{2}\.\d{4})/]);
     const classId = firstMatch(page, [/Klasse\s+(.+?)(\n|$)/, /Klasse\n(.+?)\n/]);
     const company = firstMatch(page, [/Lehrfirma\s+(.+?)(\n|$)/]);
-    const profession = firstMatch(page, [/Beruf\s+(.+?)(\n|$)/]);
+    // PDF text layer often separates the "Beruf" label from its value (column
+    // sorting), so prefer the line carrying the EFZ/EBA profession title
+    const profession = firstMatch(page, [
+        /^(?:Beruf\s+)?([^\n]*\b(?:EFZ|EBA)\b[^\n]*)$/m,
+        /Beruf\s+(.+?)(\n|$)/,
+    ]);
     const avgMatch = page.match(/Durchschnitt Module.*?(\d\.\d)/);
     const printedAverage = avgMatch ? parseFloat(avgMatch[1]) : 0;
 
