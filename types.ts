@@ -3,6 +3,7 @@ export interface ModuleGrade {
   moduleId: string;
   moduleName: string;
   grade?: number; // Absent when the module appears in the PDF but is not yet graded
+  pnab?: boolean; // "Prüfung nicht absolviert" — exam not taken, printed as "Pnab" instead of a grade
 }
 
 // Shared shape of a validated grade section (ABU, EGK, ...)

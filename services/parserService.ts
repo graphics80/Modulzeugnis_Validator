@@ -6,6 +6,8 @@ const GRADE = '[1-6]\\.[05]';
 const GRADE_TOKEN = new RegExp(`\\b${GRADE}\\b`);
 const GRADE_TOKEN_ALL = new RegExp(`\\b${GRADE}\\b`, 'g');
 const STANDALONE_GRADE = new RegExp(`^(${GRADE})$`);
+// "Prüfung nicht absolviert" — printed in place of a grade
+const PNAB = /\bPnab\b/i;
 
 const firstMatch = (page: string, regexes: RegExp[], fallback = 'Unknown'): string => {
   for (const re of regexes) {
@@ -136,6 +138,7 @@ export const parseOCRText = (text: string): StudentReport[] => {
         const semester = match[1].replace(/\s+/g, '');
         const moduleId = match[2];
         let grade: number | undefined = undefined;
+        let pnab = false;
         let name = line.substring(match.index! + match[0].length).trim();
 
         // Inline Grade Check
@@ -143,6 +146,9 @@ export const parseOCRText = (text: string): StudentReport[] => {
         if (inlineGrade) {
           grade = parseFloat(inlineGrade[0]);
           name = name.replace(inlineGrade[0], "").trim();
+        } else if (PNAB.test(name)) {
+          pnab = true;
+          name = name.replace(PNAB, "").trim();
         } else {
           // Lookahead Grade Check (for multi-line or column layouts)
           for (let k = j + 1; k < Math.min(j + 5, lines.length); k++) {
@@ -153,11 +159,15 @@ export const parseOCRText = (text: string): StudentReport[] => {
               grade = parseFloat(nextGrade[1]);
               break;
             }
+            if (/^Pnab$/i.test(nextLine)) {
+              pnab = true;
+              break;
+            }
           }
         }
 
         name = name.replace(/\s+/g, " ").trim();
-        modules.push({ semester, moduleId, moduleName: name || `Module ${moduleId}`, grade });
+        modules.push({ semester, moduleId, moduleName: name || `Module ${moduleId}`, grade, pnab: pnab || undefined });
       }
     }
 

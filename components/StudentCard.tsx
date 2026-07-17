@@ -77,6 +77,7 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
 
   const hasFailingGrades = student.failingModules.length > 0;
   const isAverageCorrect = student.isValidAverage;
+  const pnabModules = student.modules.filter(m => m.pnab);
 
   const handleOpenPdf = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,7 +96,9 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4 transition-all hover:shadow-md">
+    <div className={`bg-white rounded-lg shadow-sm border overflow-hidden mb-4 transition-all hover:shadow-md ${
+      pnabModules.length > 0 ? 'border-orange-400 ring-2 ring-orange-200' : 'border-gray-200'
+    }`}>
       <div className="p-5">
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -121,6 +124,13 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
               <div className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
                 <ExclamationTriangleIcon className="w-4 h-4" />
                 <span>{student.failingModules.length} Failed</span>
+              </div>
+            )}
+
+            {pnabModules.length > 0 && (
+              <div className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-800" title={`Prüfung nicht absolviert: ${pnabModules.map(m => m.moduleId).join(', ')}`}>
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                <span>{pnabModules.length} Pnab</span>
               </div>
             )}
           </div>
@@ -207,16 +217,16 @@ const StudentCard: React.FC<Props> = ({ student, pdfBuffer }) => {
                           {student.modules.map((m, idx) => {
                               const failing = isFailing(m);
                               return (
-                                <tr key={`${student.id}-m-${idx}`} className={failing ? 'bg-red-50' : ''}>
+                                <tr key={`${student.id}-m-${idx}`} className={m.pnab ? 'bg-orange-50' : failing ? 'bg-red-50' : ''}>
                                     <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{m.semester}</td>
                                     <td className="px-3 py-2 text-sm text-gray-900">
                                         <span className="font-mono text-gray-400 mr-2">{m.moduleId}</span>
                                         <span className="min-w-0 truncate block max-w-md">{m.moduleName}</span>
                                     </td>
                                     <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-medium ${
-                                        failing ? 'text-red-600' : 'text-gray-900'
+                                        m.pnab ? 'text-orange-700 font-bold' : failing ? 'text-red-600' : 'text-gray-900'
                                     }`}>
-                                        {formatGrade(m.grade)}
+                                        {m.pnab ? 'Pnab' : formatGrade(m.grade)}
                                     </td>
                                 </tr>
                               );

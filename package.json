@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "esbuild tests/harness.ts --bundle --platform=node --format=esm --external:canvas --alias:pdfjs-dist=./node_modules/pdfjs-dist/legacy/build/pdf.mjs --outfile=node_modules/.tmp/harness.mjs --log-level=error && node node_modules/.tmp/harness.mjs"
   },
   "dependencies": {
     "react": "^19.2.1",

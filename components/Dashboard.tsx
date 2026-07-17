@@ -172,6 +172,32 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
         </div>
       )}
 
+      {/* Pnab Warning */}
+      {(() => {
+        const pnabStudents = reports
+          .map(r => ({ report: r, pnab: r.modules.filter(m => m.pnab) }))
+          .filter(e => e.pnab.length > 0);
+        if (pnabStudents.length === 0) return null;
+        return (
+          <div className="mb-8 bg-orange-50 border border-orange-300 rounded-lg p-4 flex items-start gap-3">
+            <ExclamationTriangleIcon className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-orange-900">
+              <p className="font-semibold mb-1">
+                {pnabStudents.length} Zeugnis{pnabStudents.length > 1 ? 'se' : ''} mit nicht absolvierten Prüfungen (Pnab)
+              </p>
+              <ul className="space-y-0.5">
+                {pnabStudents.map(({ report, pnab }) => (
+                  <li key={report.id}>
+                    <span className="font-medium">{report.name}</span>
+                    <span className="text-orange-700"> ({report.classId}) — Modul{pnab.length > 1 ? 'e' : ''} {pnab.map(m => m.moduleId).join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center">
