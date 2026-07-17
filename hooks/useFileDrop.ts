@@ -23,6 +23,8 @@ export const useFileDrop = (onFile: (file: File) => void) => {
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset so picking the same file again still fires a change event
+    e.target.value = '';
     if (file) onFile(file);
   };
 
