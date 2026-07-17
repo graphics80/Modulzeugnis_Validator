@@ -1,10 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Zeugnis-Validator Mediamatiker / Informatiker
 
-# Run and deploy your AI Studio app
+Validiert Modulzeugnisse (PDF) des Bildungszentrums Zürichsee direkt im Browser —
+es werden keine Daten an einen Server geschickt.
 
-This contains everything you need to run your app locally.
+**Live:** https://zeugnisvalidator.it.bzz.ch
 
-View your app in AI Studio: https://ai.studio/apps/drive/1v2JvAS3NSK062aW0KYnEExaa4s5pG3Cj
+## Was es prüft
 
+- **Modulnoten:** berechneter Durchschnitt vs. gedruckter Durchschnitt pro Lernenden
+- **Ungenügende Module** (Note < 4.0)
+- **ABU** (Sprache & Kommunikation, Gesellschaft) und **EGK** (Englisch, Mathematik) inkl. Semesterdurchschnitten
+- **Curriculum-Check:** gefundene Module gegen den Semesterplan des Berufs
+  (Informatiker Applikationsentwicklung / Mediamatiker)
+
+PDF per Drag & Drop hochladen; pro Lernendem lässt sich die Original-Zeugnisseite
+als Einzel-PDF öffnen.
+
+## Lokal starten
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # Produktions-Build nach dist/
+```
+
+## Deployment
+
+Läuft als Docker-Container (nginx) hinter Apache-Reverse-Proxy — Details und
+Reproduktionsanleitung in [DEPLOYMENT.md](DEPLOYMENT.md), Redeploy per `./deploy.sh`.
+
+## Stack
+
+React 19 · TypeScript · Vite · Tailwind (CDN) · pdfjs-dist (Textextraktion) · pdf-lib (Seiten-Slicing)
