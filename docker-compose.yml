@@ -1,0 +1,11 @@
+services:
+  zeugnisvalidator:
+    build: .
+    image: zeugnisvalidator:latest
+    container_name: zeugnisvalidator
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # bind only to loopback; Apache reverse-proxies from :443
+    ports:
+      - "127.0.0.1:8091:8080"
