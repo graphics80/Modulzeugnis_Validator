@@ -87,6 +87,13 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
       .filter(e => e.missing.length > 0);
   }, [curriculum, reports]);
 
+  // Modules missing in at least one class — these tiles go orange even if
+  // another class has them (orange outranks green in the grid).
+  const missingAnywhere = useMemo(
+    () => new Set(missingByClass.flatMap(e => e.missing)),
+    [missingByClass],
+  );
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -166,7 +173,11 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
                     const grades = moduleGrades[modId];
                     const isMentioned = grades !== undefined;
                     const isGraded = isMentioned && grades.length > 0;
-                    const status: TileStatus = isGraded ? 'graded' : isMentioned ? 'mentioned' : 'missing';
+                    // Orange (missing in some class) outranks green: flag it even
+                    // if another loaded class has the module.
+                    const status: TileStatus = missingAnywhere.has(modId)
+                      ? 'missing'
+                      : isGraded ? 'graded' : isMentioned ? 'mentioned' : 'missing';
                     const style = TILE_STYLES[status];
                     const name = MODULE_NAMES[modId] || `Module ${modId}`;
 
@@ -176,18 +187,18 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
                         className={`text-xs p-2 rounded-lg border transition-all duration-200 flex items-start gap-3 shadow-sm ${style.box}`}
                       >
                          <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center border-2 transition-colors ${
-                             isMentioned
-                              ? 'bg-green-500 border-green-500 text-white'
-                              : 'bg-amber-500 border-amber-500 text-white'
+                             status === 'missing'
+                              ? 'bg-amber-500 border-amber-500 text-white'
+                              : 'bg-green-500 border-green-500 text-white'
                          }`}>
-                             {isMentioned
-                               ? <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />
-                               : <XMarkIcon className="w-2.5 h-2.5 stroke-[3]" />}
+                             {status === 'missing'
+                               ? <XMarkIcon className="w-2.5 h-2.5 stroke-[3]" />
+                               : <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
                          </div>
                          <div className="min-w-0 flex-1">
                            <div className="flex justify-between items-baseline gap-1">
                              <span className={`font-bold ${style.id}`}>{modId}</span>
-                             {isGraded && (
+                             {status === 'graded' && (
                                <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums">
                                  {formatGrade(average(grades))}
                                </span>
