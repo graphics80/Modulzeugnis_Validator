@@ -122,6 +122,32 @@ export const slicePdfPage = async (pdfBuffer: ArrayBuffer, pageNumber: number): 
 };
 
 /**
+ * Builds a new PDF containing only the given 1-based pages of the source PDF,
+ * in ascending page order. Used to split a multi-class file into one PDF per
+ * class. Reuses the per-buffer slice cache so the source is parsed only once.
+ */
+export const buildClassPdf = async (pdfBuffer: ArrayBuffer, pageNumbers: number[]): Promise<Uint8Array> => {
+  if (sliceCache?.buffer !== pdfBuffer) {
+    sliceCache?.urls.forEach(url => URL.revokeObjectURL(url));
+    sliceCache = { buffer: pdfBuffer, doc: PDFDocument.load(pdfBuffer), urls: new Map() };
+  }
+
+  const srcDoc = await sliceCache.doc;
+  const pageCount = srcDoc.getPageCount();
+  const indices = [...new Set(pageNumbers)]
+    .filter(n => n >= 1 && n <= pageCount)
+    .sort((a, b) => a - b)
+    .map(n => n - 1);
+
+  if (indices.length === 0) throw new Error('No valid pages for this class');
+
+  const newDoc = await PDFDocument.create();
+  const copied = await newDoc.copyPages(srcDoc, indices);
+  copied.forEach(page => newDoc.addPage(page));
+  return newDoc.save();
+};
+
+/**
  * Releases the cached PDF document and revokes its blob URLs. Call on reset so
  * the previous file's bytes and object URLs don't linger for the whole session.
  */

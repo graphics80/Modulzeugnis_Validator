@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StudentReport } from '../types';
 import StudentCard from './StudentCard';
 import DropZone from './DropZone';
 import { average, formatGrade } from '../utils/grades';
 import { MODULE_NAMES, detectCurriculum } from '../services/curriculumService';
+import { buildClassPdf } from '../services/pdfService';
 import {
   ChartBarIcon,
   UserGroupIcon,
@@ -12,6 +13,7 @@ import {
   CheckIcon,
   CloudArrowUpIcon,
   ArrowPathIcon,
+  ArrowDownTrayIcon,
   XCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -94,6 +96,52 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
     [missingByClass],
   );
 
+  // Reports grouped by class, with their 1-based source pages, for the
+  // per-class PDF split. Sorted so classes and pages come out in file order.
+  const classGroups = useMemo(() => {
+    const map = new Map<string, number[]>();
+    reports.forEach(r => {
+      if (!r.pageNumber) return;
+      const pages = map.get(r.classId) ?? [];
+      pages.push(r.pageNumber);
+      map.set(r.classId, pages);
+    });
+    return [...map.entries()]
+      .map(([classId, pages]) => ({ classId, pages: pages.sort((a, b) => a - b) }))
+      .sort((a, b) => a.classId.localeCompare(b.classId, 'de'));
+  }, [reports]);
+
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const downloadClass = async (classId: string, pages: number[]) => {
+    if (!pdfBuffer) return;
+    setDownloading(classId);
+    try {
+      const bytes = await buildClassPdf(pdfBuffer, pages);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Modulzeugnis ${classId}.pdf`.replace(/[\/\\:*?"<>|]/g, '_');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to build class PDF', err);
+      alert(`Could not build PDF for class ${classId}.`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const downloadAllClasses = async () => {
+    for (const { classId, pages } of classGroups) {
+      // Sequential: browsers throttle rapid parallel downloads.
+      await downloadClass(classId, pages);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -139,6 +187,45 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
             </DropZone>
         </div>
       </div>
+
+      {/* Class Splitter — split the uploaded file into one PDF per class */}
+      {pdfBuffer && classGroups.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8 overflow-hidden">
+          <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center gap-4">
+            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center">
+              <ArrowDownTrayIcon className="w-5 h-5 mr-2 text-indigo-600" />
+              Zeugnisse nach Klasse ({classGroups.length})
+            </h3>
+            {classGroups.length > 1 && (
+              <button
+                onClick={downloadAllClasses}
+                disabled={downloading !== null}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {downloading !== null ? 'Wird erstellt…' : 'Alle herunterladen'}
+              </button>
+            )}
+          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {classGroups.map(({ classId, pages }) => (
+              <button
+                key={classId}
+                onClick={() => downloadClass(classId, pages)}
+                disabled={downloading !== null}
+                className="flex items-center justify-between gap-2 px-4 py-3 rounded-lg border border-gray-200 bg-gray-50/50 hover:border-indigo-300 hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:pointer-events-none text-left"
+              >
+                <div className="min-w-0">
+                  <span className="block font-bold text-sm text-gray-900">{classId}</span>
+                  <span className="block text-xs text-gray-500">{pages.length} Zeugnis{pages.length > 1 ? 'se' : ''}</span>
+                </div>
+                {downloading === classId
+                  ? <ArrowPathIcon className="w-5 h-5 text-indigo-600 animate-spin flex-shrink-0" />
+                  : <ArrowDownTrayIcon className="w-5 h-5 text-indigo-500 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Curriculum Grid — the separate ABU/EGK certificate carries no modules
           (every tile would read "missing"), so only render it when grades exist. */}
