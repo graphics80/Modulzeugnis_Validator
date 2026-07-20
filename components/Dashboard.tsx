@@ -26,6 +26,21 @@ interface Props {
   onReset: () => void;
 }
 
+// Normalises a printed module title for comparison so that legitimate variants
+// of the same module collapse to one string and only a genuinely different
+// title deviates. Bilingual rows carry a "bili" marker and a
+// "(zweisprachig d/e)" suffix, and the flattened text can prepend the module
+// number to the title — all of that is stripped, along with digits and
+// parentheticals (also the non-discriminating "(UIs)").
+const normTitle = (s: string): string =>
+  s.toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')          // drop parentheticals: (zweisprachig d/e), (UIs)
+    .replace(/\bbili\b/g, ' ')
+    .replace(/zweisprachig|d\s*\/\s*e/g, ' ') // fallback if the paren was truncated
+    .replace(/[^a-zäöüß]+/g, ' ')         // strip digits, slashes and punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
+
 type TileStatus = 'graded' | 'mentioned' | 'missing';
 
 const TILE_STYLES: Record<TileStatus, { box: string; id: string; name: string }> = {
@@ -109,6 +124,49 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
     return [...map.entries()]
       .map(([classId, pages]) => ({ classId, pages: pages.sort((a, b) => a - b) }))
       .sort((a, b) => a.classId.localeCompare(b.classId, 'de'));
+  }, [reports]);
+
+  // Title/number consistency check. Two classes in one file print identical
+  // module titles per number, so the majority title per moduleId is the
+  // reference; a report whose title for a number deviates from that majority
+  // has a mismatched title (swap or typo). Compared within the uploaded file,
+  // not against the hand-typed catalog, whose wording differs from the print.
+  const titleMismatches = useMemo(() => {
+    const counts = new Map<string, Map<string, { count: number; display: string }>>();
+    reports.forEach(r =>
+      r.modules.forEach(m => {
+        const norm = normTitle(m.moduleName);
+        if (!norm || m.moduleName === `Module ${m.moduleId}`) return;
+        let byNorm = counts.get(m.moduleId);
+        if (!byNorm) { byNorm = new Map(); counts.set(m.moduleId, byNorm); }
+        const entry = byNorm.get(norm) ?? { count: 0, display: m.moduleName };
+        entry.count++;
+        byNorm.set(norm, entry);
+      }),
+    );
+
+    const majority = new Map<string, { norm: string; display: string }>();
+    counts.forEach((byNorm, id) => {
+      let best: { norm: string; display: string; count: number } | null = null;
+      byNorm.forEach((v, norm) => {
+        if (!best || v.count > best.count) best = { norm, display: v.display, count: v.count };
+      });
+      if (best) majority.set(id, { norm: best.norm, display: best.display });
+    });
+
+    return reports
+      .map(r => ({
+        report: r,
+        bad: r.modules
+          .filter(m => {
+            const norm = normTitle(m.moduleName);
+            if (!norm || m.moduleName === `Module ${m.moduleId}`) return false;
+            const maj = majority.get(m.moduleId);
+            return maj && norm !== maj.norm;
+          })
+          .map(m => ({ moduleId: m.moduleId, printed: m.moduleName, expected: majority.get(m.moduleId)!.display })),
+      }))
+      .filter(e => e.bad.length > 0);
   }, [reports]);
 
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -370,6 +428,33 @@ const Dashboard: React.FC<Props> = ({ reports, pdfBuffer, isProcessing, onNewFil
           </div>
         );
       })()}
+
+      {/* Module Title ↔ Number Mismatch */}
+      {titleMismatches.length > 0 && (
+        <div className="mb-8 bg-purple-50 border border-purple-300 rounded-lg p-4 flex items-start gap-3">
+          <ExclamationTriangleIcon className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-purple-900">
+            <p className="font-semibold mb-1">
+              {titleMismatches.length} Zeugnis{titleMismatches.length > 1 ? 'se' : ''} mit abweichendem Modultitel
+            </p>
+            <ul className="space-y-1">
+              {titleMismatches.map(({ report, bad }) => (
+                <li key={report.id}>
+                  <span className="font-medium">{report.name}</span>
+                  <span className="text-purple-700"> ({report.classId})</span>
+                  <ul className="ml-4 list-disc text-purple-800">
+                    {bad.map(b => (
+                      <li key={b.moduleId}>
+                        Modul {b.moduleId}: „{b.printed}" — erwartet „{b.expected}"
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
